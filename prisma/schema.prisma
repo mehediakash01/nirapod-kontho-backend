@@ -6,3 +6,177 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+// ENUMS
+
+enum Role {
+  SUPER_ADMIN
+  NGO_ADMIN
+  MODERATOR
+  USER
+}
+
+enum ReportType {
+  HARASSMENT
+  DOMESTIC_VIOLENCE
+  STALKING
+  CORRUPTION
+  THREAT
+}
+
+enum ReportStatus {
+  DRAFT
+  SUBMITTED
+  VERIFIED
+  REJECTED
+}
+
+enum CaseStatus {
+  UNDER_REVIEW
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+// USER 
+
+model User {
+  id        String   @id @default(uuid())
+  name      String?
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+  ngoId     String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  reports       Report[]
+  notifications Notification[]
+  donations     Donation[]
+  verifications Verification[]
+
+  ngo NGO? @relation(fields: [ngoId], references: [id])
+}
+
+// NGO
+
+model NGO {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  phone     String
+  address   String
+  createdAt DateTime @default(now())
+
+  users User[]
+  cases Case[]
+}
+
+// REPORT
+
+model Report {
+  id          String       @id @default(uuid())
+  userId      String
+  type        ReportType
+  description String
+  location    String
+  status      ReportStatus @default(SUBMITTED)
+  isAnonymous Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id])
+  evidence     Evidence[]
+  case         Case?
+  verification Verification?
+
+  @@index([userId])
+  @@index([status])
+}
+
+// EVIDENCE
+
+model Evidence {
+  id        String   @id @default(uuid())
+  reportId  String
+  fileUrl   String
+  fileType  String
+  createdAt DateTime @default(now())
+
+  report Report @relation(fields: [reportId], references: [id])
+
+  @@index([reportId])
+}
+
+// CASE
+
+model Case {
+  id            String     @id @default(uuid())
+  reportId      String     @unique
+  assignedNgoId String
+  status        CaseStatus @default(UNDER_REVIEW)
+  priority      String
+  createdAt     DateTime   @default(now())
+
+  report Report @relation(fields: [reportId], references: [id])
+  ngo    NGO    @relation(fields: [assignedNgoId], references: [id])
+
+  @@index([assignedNgoId])
+}
+
+// VERIFICATION
+
+model Verification {
+  id          String             @id @default(uuid())
+  reportId    String             @unique
+  moderatorId String
+  status      VerificationStatus @default(PENDING)
+  feedback    String?
+  createdAt   DateTime           @default(now())
+
+  report    Report @relation(fields: [reportId], references: [id])
+  moderator User   @relation(fields: [moderatorId], references: [id])
+
+  @@index([moderatorId])
+}
+
+// NOTIFICATION
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+// DONATION
+
+model Donation {
+  id            String        @id @default(uuid())
+  userId        String
+  amount        Float
+  paymentStatus PaymentStatus @default(PENDING)
+  transactionId String
+  createdAt     DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
