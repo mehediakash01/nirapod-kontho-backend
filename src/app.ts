@@ -10,8 +10,13 @@ app.use(express.json());
 app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
+app.use((err: any, req: any, res: any, next: any) => {
+  res.status(err.statusCode || 500).json({
+    success: false,
+    message: err.message || 'Internal Server Error',
+  });
+});
 
-// test route
 app.get('/', (req, res) => {
   res.send('Nirapod Kontho API Running...');
 });
