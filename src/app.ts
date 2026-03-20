@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
+import { globalErrorHandler } from './app/middleware/globalErrorHandler';
+
 
 const app = express();
 
@@ -10,15 +13,19 @@ app.use(express.json());
 app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
-app.use((err: any, req: any, res: any, next: any) => {
-  res.status(err.statusCode || 500).json({
-    success: false,
-    message: err.message || 'Internal Server Error',
-  });
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+});
+app.use(limiter);
+
+// test route
+app.get('/', (req, res) => {
+  res.send(' Nirob kontho API is Running...');
 });
 
-app.get('/', (req, res) => {
-  res.send('Nirapod Kontho API Running...');
-});
+// global error handler
+app.use(globalErrorHandler);
 
 export default app;
