@@ -1,6 +1,6 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider   = "prisma-client-js"
+  engineType = "binary"
 }
 
 datasource db {
@@ -53,21 +53,74 @@ enum PaymentStatus {
 // USER 
 
 model User {
-  id        String   @id @default(uuid())
-  name      String?
-  email     String   @unique
-  password  String
-  role      Role     @default(USER)
-  ngoId     String?
-  createdAt DateTime @default(now())
+  id            String    @id @default(uuid())
+  name          String?
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  role          Role      @default(USER)
+  ngoId         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   // Relations
-  reports       Report[]
-  notifications Notification[]
-  donations     Donation[]
-  verifications Verification[]
+  reports             Report[]
+  notifications       Notification[]
+  donations           Donation[]
+  reportVerifications ReportVerification[]
+  sessions            Session[]
+  accounts            Account[]
 
   ngo NGO? @relation(fields: [ngoId], references: [id])
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Account {
+  id                    String    @id @default(uuid())
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(uuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([identifier, value])
+  @@index([identifier])
 }
 
 // NGO
@@ -100,7 +153,7 @@ model Report {
   user         User          @relation(fields: [userId], references: [id])
   evidence     Evidence[]
   case         Case?
-  verification Verification?
+  verification ReportVerification?
 
   @@index([userId])
   @@index([status])
@@ -138,7 +191,7 @@ model Case {
 
 // VERIFICATION
 
-model Verification {
+model ReportVerification {
   id          String             @id @default(uuid())
   reportId    String             @unique
   moderatorId String

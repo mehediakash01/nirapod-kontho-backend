@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { globalErrorHandler } from './app/middleware/globalErrorHandler';
 import { auth } from './app/config/auth';
+import { authenticate, requireRole } from './app/middleware/auth';
 
 
 const app = express();
@@ -21,6 +22,17 @@ const limiter = rateLimit({
   max: 100,
 });
 app.use(limiter);
+app.get(
+  '/api/test-protected',
+  authenticate,
+  requireRole('SUPER_ADMIN'),
+  (req, res) => {
+    res.json({
+      message: 'You are authorized!',
+      user: req.user,
+    });
+  }
+);
 
 // test route
 app.get('/', (req, res) => {

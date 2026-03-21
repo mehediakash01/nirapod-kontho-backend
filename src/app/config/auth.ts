@@ -1,9 +1,7 @@
 import { betterAuth } from 'better-auth';
 
 import { prismaAdapter } from '@better-auth/prisma-adapter';
-import * as PrismaClientPackage from '@prisma/client';
-
-const prisma = new (PrismaClientPackage as any).PrismaClient();
+import { prisma } from './prisma';
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
