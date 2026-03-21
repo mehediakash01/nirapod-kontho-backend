@@ -5,17 +5,28 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { globalErrorHandler } from './app/middleware/globalErrorHandler';
 import { auth } from './app/config/auth';
+import { toNodeHandler } from 'better-auth/node';
 import { authenticate, requireRole } from './app/middleware/auth';
 
 
 const app = express();
+const authHandler = toNodeHandler(auth);
 
 // middlewares
 app.use(express.json());
 app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
-app.use('/api/auth', auth.handler);
+app.all('/api/auth/signup', (req, res) => {
+  req.url = '/api/auth/sign-up/email';
+  return authHandler(req, res);
+});
+app.all('/api/auth/signin', (req, res) => {
+  req.url = '/api/auth/sign-in/email';
+  return authHandler(req, res);
+});
+app.all('/api/auth', authHandler);
+app.all('/api/auth/*splat', authHandler);
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,

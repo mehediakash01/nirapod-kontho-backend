@@ -10,5 +10,7 @@ export const globalErrorHandler = (
     success: false,
     message: err.message || 'Internal Server Error',
     error: err,
+    
   });
+  console.error(err);
 };
