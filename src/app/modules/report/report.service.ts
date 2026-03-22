@@ -1,7 +1,8 @@
 import { prisma } from "../../config/prisma";
+import { ICreateReport } from "./report.interface";
 
 
-const createReport = async (userId: string, payload: any) => {
+const createReport = async (userId: string, payload: ICreateReport) => {
   const report = await prisma.report.create({
     data: {
       userId,
