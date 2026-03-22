@@ -14,7 +14,7 @@ export const authenticate = async (req: any, res: any, next: any) => {
     });
   }
 
-  // 🔥 fetch full user (with role)
+  //  fetch full user (with role)
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
   });

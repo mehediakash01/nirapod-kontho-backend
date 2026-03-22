@@ -7,6 +7,7 @@ import { globalErrorHandler } from './app/middleware/globalErrorHandler';
 import { auth } from './app/config/auth';
 import { toNodeHandler } from 'better-auth/node';
 import { authenticate, requireRole } from './app/middleware/auth';
+import { ReportRoutes } from './app/modules/report/report.route';
 
 
 const app = express();
@@ -33,17 +34,7 @@ const limiter = rateLimit({
   max: 100,
 });
 app.use(limiter);
-app.get(
-  '/api/test-protected',
-  authenticate,
-  requireRole('SUPER_ADMIN'),
-  (req, res) => {
-    res.json({
-      message: 'You are authorized!',
-      user: req.user,
-    });
-  }
-);
+app.use('/api/reports', ReportRoutes);
 
 // test route
 app.get('/', (req, res) => {
