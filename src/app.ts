@@ -8,6 +8,7 @@ import { auth } from './app/config/auth';
 import { toNodeHandler } from 'better-auth/node';
 import { authenticate, requireRole } from './app/middleware/auth';
 import { ReportRoutes } from './app/modules/report/report.route';
+import { VerificationRoutes } from './app/modules/verification/verification.route';
 
 
 const app = express();
@@ -35,7 +36,7 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 app.use('/api/reports', ReportRoutes);
-
+app.use('/api/verification', VerificationRoutes);
 // test route
 app.get('/', (req, res) => {
   res.send(' Nirob kontho API is Running...');
