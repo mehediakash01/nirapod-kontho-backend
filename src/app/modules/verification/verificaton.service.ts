@@ -6,11 +6,19 @@ import { AppError } from '../../errors/AppError';
 const verifyReport = async (moderatorId: string, payload: IVerifyReport) => {
   const { reportId, status, feedback } = payload;
 
-  if (!reportId) {
-    throw new AppError('reportId is required', 400);
-  }
+
   //  transaction to ensure both verification creation and report status update happen together
   const result = await prisma.$transaction(async (tx) => {
+
+
+  const report = await tx.report.findUnique({
+      where: { id: reportId },
+    });
+
+    if (!report) {
+      throw new AppError('Report not found', 404);
+    }
+
     const existing = await tx.reportVerification.findUnique({
       where: { reportId },
     });
@@ -37,11 +45,43 @@ const verifyReport = async (moderatorId: string, payload: IVerifyReport) => {
       },
     });
 
-    return verification;
+
+    //  AUTO CREATE CASE IF APPROVED
+    let caseData = null;
+
+    if (status === 'APPROVED') {
+      // find any NGO (simple version)
+   const ngo = await tx.nGO.findFirst({
+  orderBy: {
+    cases: {
+      _count: 'asc',
+    },
+  },
+});
+
+      if (!ngo) {
+        throw new AppError('No NGO available', 500);
+      }
+
+      caseData = await tx.case.create({
+        data: {
+          reportId,
+          assignedNgoId: ngo.id,
+          status: 'UNDER_REVIEW',
+          priority: 'HIGH',
+        },
+      });
+    }
+
+    return {
+      verification,
+      case: caseData,
+    };
   });
 
   return result;
 };
+;
 
 const getPendingReports = async () => {
   return prisma.report.findMany({
