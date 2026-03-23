@@ -9,6 +9,7 @@ import { toNodeHandler } from 'better-auth/node';
 import { authenticate, requireRole } from './app/middleware/auth';
 import { ReportRoutes } from './app/modules/report/report.route';
 import { VerificationRoutes } from './app/modules/verification/verification.route';
+import { NgoRoutes } from './app/modules/ngo/ngo.route';
 
 
 const app = express();
@@ -37,6 +38,7 @@ const limiter = rateLimit({
 app.use(limiter);
 app.use('/api/reports', ReportRoutes);
 app.use('/api/verification', VerificationRoutes);
+app.use('/api/ngos', NgoRoutes);
 // test route
 app.get('/', (req, res) => {
   res.send(' Nirob kontho API is Running...');
