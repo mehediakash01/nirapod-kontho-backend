@@ -9,8 +9,9 @@ export const globalErrorHandler = (
   res.status(err.statusCode || 500).json({
     success: false,
     message: err.message || 'Internal Server Error',
-    error: err,
+    error: err
     
   });
   console.error(err);
+  
 };

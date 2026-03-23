@@ -1,18 +1,24 @@
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../errors/AppError";
+import { buildQueryOptions } from "../../utils/querybuilder";
 import { IUpdateCaseStatus } from "./case.interface";
 
 
-const getMyCases = async (user: any) => {
-  // NGO admin → get their NGO id
-  if (!user.ngoId) {
-    throw new AppError('User not linked to NGO', 400);
+const getMyCases = async (user: any, query: any) => {
+  const { skip, limit } = buildQueryOptions(query);
+
+  const where: any = {
+    assignedNgoId: user.ngoId,
+  };
+
+  if (query.status) {
+    where.status = query.status;
   }
 
   const cases = await prisma.case.findMany({
-    where: {
-      assignedNgoId: user.ngoId,
-    },
+    where,
+    skip,
+    take: limit,
     include: {
       report: true,
     },
