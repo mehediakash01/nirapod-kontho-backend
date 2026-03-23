@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { catchAsync } from '../../utils/catchAsync';
 import { sendResponse } from '../../utils/sendResponse';
 import { ReportService } from './report.service';
@@ -30,16 +30,16 @@ const getMyReports = catchAsync(async (req: any, res: Response) => {
   });
 });
 
-const getAllReports = catchAsync(async (_req: any, res: Response) => {
-  const result = await ReportService.getAllReports();
+const getAllReports = catchAsync(async (req:Request, res:Response) => {
+  const result = await ReportService.getAllReports(req.query);
 
   sendResponse(res, {
     success: true,
-    message: 'All reports fetched',
-    data: result,
+    message: 'Reports fetched',
+    meta: result.meta,
+    data: result.data,
   });
 });
-
 export const ReportController = {
   createReport,
   getMyReports,

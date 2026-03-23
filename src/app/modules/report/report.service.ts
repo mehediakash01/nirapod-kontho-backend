@@ -1,4 +1,5 @@
 import { prisma } from "../../config/prisma";
+import { buildQueryOptions } from "../../utils/querybuilder";
 import { ICreateReport } from "./report.interface";
 
 
@@ -23,10 +24,58 @@ const getMyReports = async (userId: string) => {
   });
 };
 
-const getAllReports = async () => {
-  return prisma.report.findMany({
-    orderBy: { createdAt: 'desc' },
+
+
+const getAllReports = async (query: any) => {
+  const { skip, limit } = buildQueryOptions(query);
+
+  const { type, status, search } = query;
+
+  const where: any = {};
+
+  if (type) {
+    where.type = type;
+  }
+
+  if (status) {
+    where.status = status;
+  }
+
+  if (search) {
+    where.OR = [
+      {
+        description: {
+          contains: search,
+          mode: 'insensitive',
+        },
+      },
+      {
+        location: {
+          contains: search,
+          mode: 'insensitive',
+        },
+      },
+    ];
+  }
+
+  const reports = await prisma.report.findMany({
+    where,
+    skip,
+    take: limit,
+    orderBy: {
+      createdAt: 'desc',
+    },
   });
+
+  const total = await prisma.report.count({ where });
+
+  return {
+    meta: {
+      total,
+      page: Math.ceil(total / limit),
+    },
+    data: reports,
+  };
 };
 
 export const ReportService = {
