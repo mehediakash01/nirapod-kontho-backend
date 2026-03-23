@@ -10,6 +10,7 @@ import { authenticate, requireRole } from './app/middleware/auth';
 import { ReportRoutes } from './app/modules/report/report.route';
 import { VerificationRoutes } from './app/modules/verification/verification.route';
 import { NgoRoutes } from './app/modules/ngo/ngo.route';
+import { CaseRoutes } from './app/modules/case/case.route';
 
 
 const app = express();
@@ -39,6 +40,7 @@ app.use(limiter);
 app.use('/api/reports', ReportRoutes);
 app.use('/api/verification', VerificationRoutes);
 app.use('/api/ngos', NgoRoutes);
+app.use('/api/cases', CaseRoutes);
 // test route
 app.get('/', (req, res) => {
   res.send(' Nirob kontho API is Running...');
