@@ -1,20 +1,21 @@
 import express from 'express';
 import { authenticate, requireRole } from '../../middleware/auth';
-import { createNgoSchema } from './ngo.validation';
+
 import { validateRequest } from '../../middleware/validationRequest';
 import { NgoController } from './ngo.controllter';
+import { createNgoWithAdminSchema } from './ngo.validation';
 
 
 const router = express.Router();
 
-// 🔥 Create NGO (Super Admin only)
+//  Create NGO (Super Admin only)
 router.post(
-  '/',
+  '/create-with-admin',
   authenticate,
   requireRole('SUPER_ADMIN'),
-  validateRequest(createNgoSchema),
-  NgoController.createNgo
-);
+  validateRequest(createNgoWithAdminSchema),
+  NgoController.createNgoWithAdmin
+);;
 
 // Get all NGOs
 router.get(

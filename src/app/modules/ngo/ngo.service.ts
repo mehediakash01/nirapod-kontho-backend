@@ -1,23 +1,71 @@
-import { prisma } from "../../config/prisma";
-import { AppError } from "../../errors/AppError";
+import { prisma } from '../../config/prisma';
+import { AppError } from '../../errors/AppError';
+import { auth } from '../../config/auth';
+import { ICreateNGO } from './ngo.interface';
 
+const createNgoWithAdmin = async (payload: ICreateNGO) => {
+  const { name, email, phone, address, admin } = payload;
 
-const createNgo = async (payload: any) => {
-  // check if email exists
-  const existing = await prisma.nGO.findUnique({
-    where: { email: payload.email },
+  const existingNgo = await prisma.nGO.findUnique({
+    where: { email },
   });
 
-  if (existing) {
+  if (existingNgo) {
     throw new AppError('NGO already exists with this email', 400);
   }
 
-  const ngo = await prisma.nGO.create({
-    data: payload,
+  // Run external auth call outside transaction to prevent transaction timeout.
+  const userRes = await auth.api.signUpEmail({
+    body: {
+      email: admin.email,
+      password: admin.password,
+      name: admin.name,
+    },
   });
 
-  return ngo;
+  if (!userRes?.user?.id) {
+    throw new AppError('Failed to create NGO admin user', 500);
+  }
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. create NGO
+      const ngo = await tx.nGO.create({
+        data: {
+          name,
+          email,
+          phone,
+          address,
+        },
+      });
+
+      // 2. update user → assign role + ngoId
+      const updatedUser = await tx.user.update({
+        where: { id: userRes.user.id },
+        data: {
+          role: 'NGO_ADMIN',
+          ngoId: ngo.id,
+        },
+      });
+
+      return {
+        ngo,
+        admin: updatedUser,
+      };
+    });
+
+    return result;
+  } catch (error) {
+    // Compensate: remove just-created auth user if NGO transaction fails.
+    await prisma.user.delete({
+      where: { id: userRes.user.id },
+    }).catch(() => undefined);
+
+    throw error;
+  }
 };
+
+
 
 const getAllNgo = async () => {
   return prisma.nGO.findMany({
@@ -43,7 +91,7 @@ const getSingleNgo = async (id: string) => {
 };
 
 export const NgoService = {
-  createNgo,
+  createNgoWithAdmin,
   getAllNgo,
   getSingleNgo,
 };

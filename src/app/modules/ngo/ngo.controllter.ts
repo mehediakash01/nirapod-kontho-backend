@@ -4,13 +4,13 @@ import { catchAsync } from '../../utils/catchAsync';
 import { sendResponse } from '../../utils/sendResponse';
 import { AppError } from '../../errors/AppError';
 
-const createNgo = catchAsync(async (req: Request, res: Response) => {
-  const result = await NgoService.createNgo(req.body);
+const createNgoWithAdmin = catchAsync(async (req:Request, res:Response) => {
+  const result = await NgoService.createNgoWithAdmin(req.body);
 
   sendResponse(res, {
     statusCode: 201,
     success: true,
-    message: 'NGO created successfully',
+    message: 'NGO and Admin created successfully',
     data: result,
   });
 });
@@ -42,7 +42,7 @@ const getSingleNgo = catchAsync(async (req:Request, res:Response) => {
 });
 
 export const NgoController = {
-  createNgo,
+  createNgoWithAdmin,
   getAllNgo,
   getSingleNgo,
 };
