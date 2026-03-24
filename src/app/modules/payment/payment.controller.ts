@@ -33,6 +33,29 @@ const confirmPayment = catchAsync(async (req: any, res: Response) => {
   });
 });
 
+const createMonthlySubscription = catchAsync(async (req: any, res: Response) => {
+  const userId = req.user.id;
+  const { amount } = req.body;
+
+  const result = await PaymentService.createMonthlySubscription(userId, amount);
+
+  sendResponse(res, {
+    success: true,
+    message: 'Monthly subscription checkout session created',
+    data: result,
+  });
+});
+
+const getDonationDashboard = catchAsync(async (_req: Request, res: Response) => {
+  const result = await PaymentService.getDonationDashboard();
+
+  sendResponse(res, {
+    success: true,
+    message: 'Donation dashboard fetched',
+    data: result,
+  });
+});
+
 const handleWebhook = async (req: Request, res: Response) => {
   const signature = req.headers['stripe-signature'];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -58,5 +81,7 @@ const handleWebhook = async (req: Request, res: Response) => {
 export const PaymentController = {
   createPaymentIntent,
   confirmPayment,
+  createMonthlySubscription,
+  getDonationDashboard,
   handleWebhook,
 };
