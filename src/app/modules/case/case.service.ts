@@ -1,6 +1,6 @@
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../errors/AppError";
-import { buildQueryOptions } from "../../utils/querybuilder";
+import { buildQueryOptions } from "../../utils/queryBuilder";
 import { IUpdateCaseStatus } from "./case.interface";
 
 
@@ -37,11 +37,15 @@ const updateCaseStatus = async (
 ) => {
   const existingCase = await prisma.case.findUnique({
     where: { id: caseId },
+    include: {
+      report: true,
+    },
   });
 
   if (!existingCase) {
     throw new AppError('Case not found', 404);
   }
+  
 
   //  ensure NGO owns this case
   if (existingCase.assignedNgoId !== user.ngoId) {
@@ -54,9 +58,17 @@ const updateCaseStatus = async (
       status: payload.status,
     },
   });
+  await prisma.notification.create({
+  data: {
+    userId: existingCase.report.userId,
+    message: `Your case status updated to ${payload.status}`,
+  },
+});
 
   return updated;
 };
+
+
 
 export const CaseService = {
   getMyCases,

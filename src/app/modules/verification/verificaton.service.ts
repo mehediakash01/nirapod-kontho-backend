@@ -1,6 +1,7 @@
 import { prisma } from "../../config/prisma";
 import { IVerifyReport } from './verification.interface';
 import { AppError } from '../../errors/AppError';
+import { NotificationService } from '../notification/notification.service';
 
 
 const verifyReport = async (moderatorId: string, payload: IVerifyReport) => {
@@ -42,6 +43,12 @@ const verifyReport = async (moderatorId: string, payload: IVerifyReport) => {
       where: { id: reportId },
       data: {
         status: status === 'APPROVED' ? 'VERIFIED' : 'REJECTED',
+      },
+    });
+    await tx.notification.create({
+      data: {
+        userId: report.userId,
+        message: NotificationService.buildVerificationMessage(status),
       },
     });
 

@@ -1,5 +1,6 @@
 import { prisma } from "../../config/prisma";
-import { buildQueryOptions } from "../../utils/querybuilder";
+import { buildQueryOptions } from "../../utils/queryBuilder";
+
 import { ICreateReport } from "./report.interface";
 
 
