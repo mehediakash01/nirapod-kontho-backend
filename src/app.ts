@@ -27,7 +27,23 @@ app.post(
 
 // middlewares
 app.use(express.json());
-app.use(cors());
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'http://localhost:3000',
+  'http://localhost:3000',
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+  })
+);
 app.use(helmet());
 app.use(morgan('dev'));
 app.all('/api/auth/signup', (req, res) => {
