@@ -54,6 +54,10 @@ app.all('/api/auth/signin', (req, res) => {
   req.url = '/api/auth/sign-in/email';
   return authHandler(req, res);
 });
+app.all('/api/auth/session', (req, res) => {
+  req.url = '/api/auth/get-session';
+  return authHandler(req, res);
+});
 app.all('/api/auth', authHandler);
 app.all('/api/auth/*splat', authHandler);
 
