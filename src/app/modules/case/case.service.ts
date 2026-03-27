@@ -21,6 +21,21 @@ const getMyCases = async (user: any, query: any) => {
     take: limit,
     include: {
       report: true,
+      notes: {
+        orderBy: {
+          createdAt: 'desc',
+        },
+        take: 5,
+        include: {
+          author: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      },
     },
     orderBy: {
       createdAt: 'desc',
@@ -52,22 +67,63 @@ const updateCaseStatus = async (
     throw new AppError('Unauthorized to update this case', 403);
   }
 
-  const updated = await prisma.case.update({
-    where: { id: caseId },
-    data: {
-      status: payload.status,
-    },
-  });
-  await prisma.notification.create({
-  data: {
-    userId: existingCase.report.userId,
-    message: payload.note
-      ? `Your case status updated to ${payload.status}. Please check your dashboard for details.`
-      : `Your case status updated to ${payload.status}`,
-  },
-});
+  const updatedCase = await prisma.$transaction(async (tx) => {
+    await tx.case.update({
+      where: { id: caseId },
+      data: {
+        status: payload.status,
+      },
+    });
 
-  return updated;
+    if (payload.note?.trim()) {
+      await tx.caseNote.create({
+        data: {
+          caseId,
+          authorId: user.id,
+          note: payload.note.trim(),
+        },
+      });
+    }
+
+    await tx.notification.create({
+      data: {
+        userId: existingCase.report.userId,
+        message: payload.note
+          ? `Your case status updated to ${payload.status}. Please check your dashboard for details.`
+          : `Your case status updated to ${payload.status}`,
+      },
+    });
+
+    const fullCase = await tx.case.findUnique({
+      where: { id: caseId },
+      include: {
+        report: true,
+        notes: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 5,
+          include: {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!fullCase) {
+      throw new AppError('Case not found after update', 404);
+    }
+
+    return fullCase;
+  });
+
+  return updatedCase;
 };
 
 

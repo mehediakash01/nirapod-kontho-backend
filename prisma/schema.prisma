@@ -68,6 +68,7 @@ model User {
   notifications       Notification[]
   donations           Donation[]
   reportVerifications ReportVerification[]
+  caseNotes           CaseNote[]
   sessions            Session[]
   accounts            Account[]
 
@@ -185,10 +186,26 @@ model Case {
   priority      String
   createdAt     DateTime   @default(now())
 
-  report Report @relation(fields: [reportId], references: [id])
-  ngo    NGO    @relation(fields: [assignedNgoId], references: [id])
+  report Report     @relation(fields: [reportId], references: [id])
+  ngo    NGO        @relation(fields: [assignedNgoId], references: [id])
+  notes  CaseNote[]
 
   @@index([assignedNgoId])
+}
+
+model CaseNote {
+  id        String   @id @default(uuid())
+  caseId    String
+  authorId  String
+  note      String
+  createdAt DateTime @default(now())
+
+  case   Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([authorId])
+  @@index([createdAt])
 }
 
 // VERIFICATION
