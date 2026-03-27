@@ -6,7 +6,7 @@ import { sendResponse } from '../../utils/sendResponse';
 const getMyCases = catchAsync(async (req: any, res: Response) => {
   const user = req.user;
 
-  const result = await CaseService.getMyCases(user);
+  const result = await CaseService.getMyCases(user, req.query);
 
   sendResponse(res, {
     success: true,
