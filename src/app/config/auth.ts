@@ -22,4 +22,14 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
   },
+
+  user: {
+    additionalFields: {
+      role: {
+        type: 'string',
+        required: false,
+        input: false,
+      },
+    },
+  },
 });
