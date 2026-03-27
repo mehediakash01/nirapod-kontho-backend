@@ -8,5 +8,6 @@ export const updateCaseSchema = z.object({
       'RESOLVED',
       'CLOSED',
     ]),
+    note: z.string().max(500).optional(),
 
 });

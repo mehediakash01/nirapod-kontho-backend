@@ -61,7 +61,9 @@ const updateCaseStatus = async (
   await prisma.notification.create({
   data: {
     userId: existingCase.report.userId,
-    message: `Your case status updated to ${payload.status}`,
+    message: payload.note
+      ? `Your case status updated to ${payload.status}. Please check your dashboard for details.`
+      : `Your case status updated to ${payload.status}`,
   },
 });
 
