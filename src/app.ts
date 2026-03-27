@@ -13,6 +13,9 @@ import { CaseRoutes } from './app/modules/case/case.route';
 import { NotificationRoutes } from './app/modules/notification/notificaiton.route';
 import { PaymentRoutes } from './app/modules/payment/payment.route';
 import { PaymentController } from './app/modules/payment/payment.controller';
+import OAuthRoutes from './app/modules/oauth/oauth.route';
+import OAuthCallbackRoutes from './app/modules/oauth/oauth.callback';
+import OAuthSessionRoutes from './app/modules/oauth/oauth.session';
 
 
 const app = express();
@@ -58,20 +61,29 @@ app.all('/api/auth/session', (req, res) => {
   req.url = '/api/auth/get-session';
   return authHandler(req, res);
 });
-app.all('/api/auth', authHandler);
-app.all('/api/auth/*splat', authHandler);
 
+// Rate limiter
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
 });
 app.use(limiter);
+
+// Routes
 app.use('/api/reports', ReportRoutes);
 app.use('/api/verification', VerificationRoutes);
 app.use('/api/ngos', NgoRoutes);
 app.use('/api/cases', CaseRoutes);
 app.use('/api/notifications', NotificationRoutes);
 app.use('/api/payments', PaymentRoutes);
+app.use('/api/oauth/callback', OAuthCallbackRoutes);
+app.use('/api/oauth', OAuthSessionRoutes);
+app.use('/api/oauth', OAuthRoutes);
+
+// Better-auth handler for remaining auth routes
+app.all('/api/auth', authHandler);
+app.all('/api/auth/*splat', authHandler);
+
 // test route
 app.get('/', (req, res) => {
   res.send(' Nirob kontho API is Running...');
