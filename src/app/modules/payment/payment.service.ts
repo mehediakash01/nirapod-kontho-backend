@@ -7,7 +7,7 @@ const createOrUpdateDonation = async (
   transactionId: string,
   userId: string,
   amount: number,
-  paymentStatus: 'SUCCESS' | 'FAILED'
+  paymentStatus: 'PENDING' | 'SUCCESS' | 'FAILED'
 ) => {
   const existing = await prisma.donation.findFirst({
     where: { transactionId },
@@ -150,10 +150,77 @@ const createMonthlySubscription = async (userId: string, amount: number) => {
   };
 };
 
+const createOneTimeCheckout = async (userId: string, amount: number) => {
+  const amountInCents = Math.round(amount * 100);
+
+  if (amountInCents <= 0) {
+    throw new AppError('Amount must be greater than 0', 400);
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  const appUrl = process.env.CLIENT_URL || 'http://localhost:3000';
+
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    customer_email: user.email,
+    line_items: [
+      {
+        quantity: 1,
+        price_data: {
+          currency: 'usd',
+          unit_amount: amountInCents,
+          product_data: {
+            name: 'One-time Donation',
+          },
+        },
+      },
+    ],
+    metadata: {
+      userId,
+      type: 'ONE_TIME_DONATION',
+      amount: String(amount),
+    },
+    success_url: `${appUrl}/donation/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${appUrl}/donation/cancel`,
+  });
+
+  await createOrUpdateDonation(session.id, userId, amount, 'PENDING');
+
+  return {
+    checkoutUrl: session.url,
+    sessionId: session.id,
+  };
+};
+
+const getMyDonations = async (userId: string) => {
+  return prisma.donation.findMany({
+    where: { userId },
+    orderBy: {
+      createdAt: 'desc',
+    },
+  });
+};
+
 const getDonationDashboard = async () => {
   const donations = await prisma.donation.findMany({
     orderBy: {
-      createdAt: 'asc',
+      createdAt: 'desc',
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
     },
   });
 
@@ -215,6 +282,15 @@ const getDonationDashboard = async () => {
     (d) => d.paymentStatus === 'SUCCESS' && d.transactionId.startsWith('in_')
   ).length;
 
+  const recentTransactions = donations.slice(0, 20).map((donation) => ({
+    id: donation.id,
+    amount: donation.amount,
+    paymentStatus: donation.paymentStatus,
+    transactionId: donation.transactionId,
+    createdAt: donation.createdAt,
+    user: donation.user,
+  }));
+
   return {
     summary: {
       totalAmount,
@@ -225,10 +301,35 @@ const getDonationDashboard = async () => {
       monthlySubscriptionPayments,
     },
     monthlyTrend,
+    recentTransactions,
   };
 };
 
 const handleWebhookEvent = async (event: Stripe.Event) => {
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const userId = session.metadata?.userId;
+
+    if (!userId) {
+      return;
+    }
+
+    const amount = ((session.amount_total || 0) / 100);
+    await createOrUpdateDonation(session.id, userId, amount, 'SUCCESS');
+  }
+
+  if (event.type === 'checkout.session.async_payment_failed') {
+    const session = event.data.object as Stripe.Checkout.Session;
+    const userId = session.metadata?.userId;
+
+    if (!userId) {
+      return;
+    }
+
+    const amount = ((session.amount_total || 0) / 100);
+    await createOrUpdateDonation(session.id, userId, amount, 'FAILED');
+  }
+
   if (event.type === 'payment_intent.succeeded') {
     const paymentIntent = event.data.object as Stripe.PaymentIntent;
 
@@ -298,6 +399,8 @@ export const PaymentService = {
   createPaymentIntent,
   confirmPayment,
   createMonthlySubscription,
+  createOneTimeCheckout,
+  getMyDonations,
   getDonationDashboard,
   handleWebhookEvent,
 };

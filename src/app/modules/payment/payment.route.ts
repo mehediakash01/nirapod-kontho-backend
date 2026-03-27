@@ -5,6 +5,7 @@ import { validateRequest } from '../../middleware/validationRequest';
 import {
   createPaymentIntentSchema,
   confirmPaymentSchema,
+  createOneTimeCheckoutSchema,
   createMonthlySubscriptionSchema,
 } from './payment.validation';
 
@@ -30,6 +31,19 @@ router.post(
   authenticate,
   validateRequest(createMonthlySubscriptionSchema),
   PaymentController.createMonthlySubscription
+);
+
+router.post(
+  '/one-time-checkout',
+  authenticate,
+  validateRequest(createOneTimeCheckoutSchema),
+  PaymentController.createOneTimeCheckout
+);
+
+router.get(
+  '/my-history',
+  authenticate,
+  PaymentController.getMyDonations
 );
 
 router.get(

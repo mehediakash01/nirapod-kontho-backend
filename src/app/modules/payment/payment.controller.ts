@@ -46,6 +46,30 @@ const createMonthlySubscription = catchAsync(async (req: any, res: Response) => 
   });
 });
 
+const createOneTimeCheckout = catchAsync(async (req: any, res: Response) => {
+  const userId = req.user.id;
+  const { amount } = req.body;
+
+  const result = await PaymentService.createOneTimeCheckout(userId, amount);
+
+  sendResponse(res, {
+    success: true,
+    message: 'One-time checkout session created',
+    data: result,
+  });
+});
+
+const getMyDonations = catchAsync(async (req: any, res: Response) => {
+  const userId = req.user.id;
+  const result = await PaymentService.getMyDonations(userId);
+
+  sendResponse(res, {
+    success: true,
+    message: 'Donation history fetched',
+    data: result,
+  });
+});
+
 const getDonationDashboard = catchAsync(async (_req: Request, res: Response) => {
   const result = await PaymentService.getDonationDashboard();
 
@@ -82,6 +106,8 @@ export const PaymentController = {
   createPaymentIntent,
   confirmPayment,
   createMonthlySubscription,
+  createOneTimeCheckout,
+  getMyDonations,
   getDonationDashboard,
   handleWebhook,
 };

@@ -11,3 +11,7 @@ export const confirmPaymentSchema = z.object({
 export const createMonthlySubscriptionSchema = z.object({
   amount: z.number().positive('Amount must be greater than 0'),
 });
+
+export const createOneTimeCheckoutSchema = z.object({
+  amount: z.number().positive('Amount must be greater than 0'),
+});
