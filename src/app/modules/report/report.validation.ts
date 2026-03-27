@@ -12,3 +12,8 @@ export const createReportSchema = z.object({
   location: z.string().min(3),
   isAnonymous: z.coerce.boolean().optional(),
 });
+
+export const updateReportStatusSchema = z.object({
+  status: z.enum(['APPROVED', 'REJECTED']),
+  note: z.string().optional(),
+});

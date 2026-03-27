@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { catchAsync } from '../../utils/catchAsync';
 import { sendResponse } from '../../utils/sendResponse';
 import { ReportService } from './report.service';
+import { VerificationService } from '../verification/verificaton.service';
 
 
 
@@ -40,8 +41,39 @@ const getAllReports = catchAsync(async (req:Request, res:Response) => {
     data: result.data,
   });
 });
+
+const getPendingReports = catchAsync(async (req: Request, res: Response) => {
+  const result = await VerificationService.getPendingReports();
+
+  sendResponse(res, {
+    success: true,
+    message: 'Pending reports fetched',
+    data: result,
+  });
+});
+
+const updateReportStatus = catchAsync(async (req: any, res: Response) => {
+  const moderatorId = req.user.id;
+  const { id } = req.params;
+  const { status, note } = req.body;
+
+  const result = await VerificationService.verifyReport(moderatorId, {
+    reportId: id,
+    status,
+    feedback: note,
+  });
+
+  sendResponse(res, {
+    success: true,
+    message: 'Report status updated successfully',
+    data: result,
+  });
+});
+
 export const ReportController = {
   createReport,
   getMyReports,
   getAllReports,
+  getPendingReports,
+  updateReportStatus,
 };

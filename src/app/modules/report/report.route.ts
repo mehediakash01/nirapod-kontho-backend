@@ -2,7 +2,7 @@ import express from 'express';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { validateRequest } from '../../middleware/validationRequest';
 import { ReportController } from './report.controller';
-import { createReportSchema } from './report.validation';
+import { createReportSchema, updateReportStatusSchema } from './report.validation';
 
 const router = express.Router();
 
@@ -19,6 +19,23 @@ router.get(
   '/my',
   authenticate,
   ReportController.getMyReports
+);
+
+// Get pending reports (Moderator)
+router.get(
+  '/pending',
+  authenticate,
+  requireRole('SUPER_ADMIN', 'MODERATOR'),
+  ReportController.getPendingReports
+);
+
+// Update report status (Moderator)
+router.patch(
+  '/:id/status',
+  authenticate,
+  requireRole('SUPER_ADMIN', 'MODERATOR'),
+  validateRequest(updateReportStatusSchema),
+  ReportController.updateReportStatus
 );
 
 // Admin/Moderator get all reports
