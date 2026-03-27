@@ -2,7 +2,7 @@ import express from 'express';
 import { authenticate, requireRole } from '../../middleware/auth';
 import { validateRequest } from '../../middleware/validationRequest';
 import { ReportController } from './report.controller';
-import { createReportSchema, updateReportStatusSchema } from './report.validation';
+import { assignReportSchema, createReportSchema, updateReportStatusSchema } from './report.validation';
 
 const router = express.Router();
 
@@ -36,6 +36,15 @@ router.patch(
   requireRole('SUPER_ADMIN', 'MODERATOR'),
   validateRequest(updateReportStatusSchema),
   ReportController.updateReportStatus
+);
+
+// Assign NGO to report (Super Admin)
+router.patch(
+  '/:id/assign',
+  authenticate,
+  requireRole('SUPER_ADMIN'),
+  validateRequest(assignReportSchema),
+  ReportController.assignNgoToReport
 );
 
 // Admin/Moderator get all reports

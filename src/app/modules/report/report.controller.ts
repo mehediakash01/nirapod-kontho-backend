@@ -3,6 +3,7 @@ import { catchAsync } from '../../utils/catchAsync';
 import { sendResponse } from '../../utils/sendResponse';
 import { ReportService } from './report.service';
 import { VerificationService } from '../verification/verificaton.service';
+import { AppError } from '../../errors/AppError';
 
 
 
@@ -70,10 +71,27 @@ const updateReportStatus = catchAsync(async (req: any, res: Response) => {
   });
 });
 
+const assignNgoToReport = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  if (!id || Array.isArray(id)) {
+    throw new AppError('Invalid report id', 400);
+  }
+
+  const result = await ReportService.assignNgoToReport(id, req.body);
+
+  sendResponse(res, {
+    success: true,
+    message: 'NGO assigned to report successfully',
+    data: result,
+  });
+});
+
 export const ReportController = {
   createReport,
   getMyReports,
   getAllReports,
   getPendingReports,
   updateReportStatus,
+  assignNgoToReport,
 };

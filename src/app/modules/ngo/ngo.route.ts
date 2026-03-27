@@ -15,19 +15,27 @@ router.post(
   requireRole('SUPER_ADMIN'),
   validateRequest(createNgoWithAdminSchema),
   NgoController.createNgoWithAdmin
-);;
+);
 
 // Get all NGOs
 router.get(
   '/',
   authenticate,
+  requireRole('NGO_ADMIN', 'MODERATOR', 'SUPER_ADMIN'),
   NgoController.getAllNgo
 );
 
 // Get single NGO
 router.get(
+  '/analytics/summary',
+  authenticate,
+  requireRole('SUPER_ADMIN'),
+  NgoController.getAnalytics
+);
+router.get(
   '/:id',
   authenticate,
+  requireRole('NGO_ADMIN', 'MODERATOR', 'SUPER_ADMIN'),
   NgoController.getSingleNgo
 );
 

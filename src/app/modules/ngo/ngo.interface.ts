@@ -9,3 +9,15 @@ export interface ICreateNGO {
     password: string;
   };
 }
+
+export interface ISuperAdminAnalytics {
+  totalNgos: number;
+  totalReports: number;
+  submittedReports: number;
+  verifiedReports: number;
+  rejectedReports: number;
+  totalCases: number;
+  activeCases: number;
+  resolvedCases: number;
+  totalSuccessfulDonations: number;
+}

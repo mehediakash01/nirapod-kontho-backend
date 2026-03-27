@@ -17,3 +17,8 @@ export const updateReportStatusSchema = z.object({
   status: z.enum(['APPROVED', 'REJECTED']),
   note: z.string().optional(),
 });
+
+export const assignReportSchema = z.object({
+  ngoId: z.string().min(1, 'ngoId is required'),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
+});

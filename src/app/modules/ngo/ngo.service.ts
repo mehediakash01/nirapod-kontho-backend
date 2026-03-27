@@ -1,7 +1,7 @@
 import { prisma } from '../../config/prisma';
 import { AppError } from '../../errors/AppError';
 import { auth } from '../../config/auth';
-import { ICreateNGO } from './ngo.interface';
+import { ICreateNGO, ISuperAdminAnalytics } from './ngo.interface';
 
 const createNgoWithAdmin = async (payload: ICreateNGO) => {
   const { name, email, phone, address, admin } = payload;
@@ -90,8 +90,47 @@ const getSingleNgo = async (id: string) => {
   return ngo;
 };
 
+const getAnalytics = async (): Promise<ISuperAdminAnalytics> => {
+  const [
+    totalNgos,
+    totalReports,
+    submittedReports,
+    verifiedReports,
+    rejectedReports,
+    totalCases,
+    activeCases,
+    resolvedCases,
+    donations,
+  ] = await Promise.all([
+    prisma.nGO.count(),
+    prisma.report.count(),
+    prisma.report.count({ where: { status: 'SUBMITTED' } }),
+    prisma.report.count({ where: { status: 'VERIFIED' } }),
+    prisma.report.count({ where: { status: 'REJECTED' } }),
+    prisma.case.count(),
+    prisma.case.count({ where: { status: { in: ['UNDER_REVIEW', 'IN_PROGRESS'] } } }),
+    prisma.case.count({ where: { status: { in: ['RESOLVED', 'CLOSED'] } } }),
+    prisma.donation.findMany({ where: { paymentStatus: 'SUCCESS' }, select: { amount: true } }),
+  ]);
+
+  const totalSuccessfulDonations = donations.reduce((sum, donation) => sum + donation.amount, 0);
+
+  return {
+    totalNgos,
+    totalReports,
+    submittedReports,
+    verifiedReports,
+    rejectedReports,
+    totalCases,
+    activeCases,
+    resolvedCases,
+    totalSuccessfulDonations,
+  };
+};
+
 export const NgoService = {
   createNgoWithAdmin,
   getAllNgo,
   getSingleNgo,
+  getAnalytics,
 };

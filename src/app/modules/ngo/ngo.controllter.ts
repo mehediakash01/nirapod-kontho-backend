@@ -41,8 +41,19 @@ const getSingleNgo = catchAsync(async (req:Request, res:Response) => {
   });
 });
 
+const getAnalytics = catchAsync(async (req: Request, res: Response) => {
+  const result = await NgoService.getAnalytics();
+
+  sendResponse(res, {
+    success: true,
+    message: 'Super admin analytics fetched successfully',
+    data: result,
+  });
+});
+
 export const NgoController = {
   createNgoWithAdmin,
   getAllNgo,
   getSingleNgo,
+  getAnalytics,
 };
