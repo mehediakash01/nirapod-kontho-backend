@@ -12,7 +12,24 @@ const createReport = async (userId: string, payload: ICreateReport) => {
       type: payload.type,
       description: payload.description,
       location: payload.location,
+      incidentDate: payload.incidentDate,
+      severity: payload.severity,
+      latitude: payload.latitude ?? null,
+      longitude: payload.longitude ?? null,
+      voiceNoteUrl: payload.voiceNoteUrl,
       isAnonymous: payload.isAnonymous ?? false,
+      evidence:
+        payload.evidenceFiles && payload.evidenceFiles.length > 0
+          ? {
+              create: payload.evidenceFiles.map((file) => ({
+                fileUrl: file.fileUrl,
+                fileType: file.fileType,
+              })),
+            }
+          : undefined,
+    },
+    include: {
+      evidence: true,
     },
   });
 

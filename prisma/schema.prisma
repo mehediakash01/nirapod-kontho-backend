@@ -31,6 +31,12 @@ enum ReportStatus {
   REJECTED
 }
 
+enum SeverityLevel {
+  MILD
+  MODERATE
+  URGENT
+}
+
 enum CaseStatus {
   UNDER_REVIEW
   IN_PROGRESS
@@ -141,14 +147,19 @@ model NGO {
 // REPORT
 
 model Report {
-  id          String       @id @default(uuid())
-  userId      String
-  type        ReportType
-  description String
-  location    String
-  status      ReportStatus @default(SUBMITTED)
-  isAnonymous Boolean      @default(false)
-  createdAt   DateTime     @default(now())
+  id           String         @id @default(uuid())
+  userId       String
+  type         ReportType
+  description  String
+  location     String
+  incidentDate DateTime?
+  severity     SeverityLevel?
+  latitude     Float?
+  longitude    Float?
+  voiceNoteUrl String?
+  status       ReportStatus   @default(SUBMITTED)
+  isAnonymous  Boolean        @default(false)
+  createdAt    DateTime       @default(now())
 
   // Relations
   user         User                @relation(fields: [userId], references: [id])
