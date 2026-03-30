@@ -20,7 +20,15 @@ const getMyCases = async (user: any, query: any) => {
     skip,
     take: limit,
     include: {
-      report: true,
+      report: {
+        include: {
+          evidence: {
+            orderBy: {
+              createdAt: 'desc',
+            },
+          },
+        },
+      },
       notes: {
         orderBy: {
           createdAt: 'desc',
@@ -97,7 +105,15 @@ const updateCaseStatus = async (
     const fullCase = await tx.case.findUnique({
       where: { id: caseId },
       include: {
-        report: true,
+        report: {
+          include: {
+            evidence: {
+              orderBy: {
+                createdAt: 'desc',
+              },
+            },
+          },
+        },
         notes: {
           orderBy: {
             createdAt: 'desc',
