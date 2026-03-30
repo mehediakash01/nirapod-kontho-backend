@@ -14,6 +14,20 @@ router.get(
   VerificationController.getPendingReports
 );
 
+router.get(
+  '/overview',
+  authenticate,
+  requireRole('MODERATOR', 'SUPER_ADMIN'),
+  VerificationController.getOverview
+);
+
+router.get(
+  '/recent',
+  authenticate,
+  requireRole('MODERATOR', 'SUPER_ADMIN'),
+  VerificationController.getRecentDecisions
+);
+
 //  Verify report
 router.post(
   '/',

@@ -30,7 +30,31 @@ const getPendingReports = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getOverview = catchAsync(async (req: any, res: Response) => {
+  const moderatorId = req.user.id;
+  const result = await VerificationService.getOverview(moderatorId);
+
+  sendResponse(res, {
+    success: true,
+    message: 'Verification overview fetched',
+    data: result,
+  });
+});
+
+const getRecentDecisions = catchAsync(async (req: any, res: Response) => {
+  const moderatorId = req.user.id;
+  const result = await VerificationService.getRecentDecisions(moderatorId);
+
+  sendResponse(res, {
+    success: true,
+    message: 'Recent verification decisions fetched',
+    data: result,
+  });
+});
+
 export const VerificationController = {
   verifyReport,
   getPendingReports,
+  getOverview,
+  getRecentDecisions,
 };

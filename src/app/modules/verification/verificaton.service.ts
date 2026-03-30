@@ -5,7 +5,23 @@ import { NotificationService } from '../notification/notification.service';
 
 
 const verifyReport = async (moderatorId: string, payload: IVerifyReport) => {
-  const { reportId, status, feedback } = payload;
+  const { reportId, status, feedback, rejectionReason, checklist } = payload;
+
+  if (status === 'REJECTED' && !rejectionReason) {
+    throw new AppError('rejectionReason is required when rejecting a report', 400);
+  }
+
+  const feedbackParts: string[] = [];
+  if (status === 'REJECTED' && rejectionReason) {
+    feedbackParts.push(`Rejection reason: ${rejectionReason}`);
+  }
+  if (checklist && checklist.length > 0) {
+    feedbackParts.push(`Checklist: ${checklist.join(', ')}`);
+  }
+  if (feedback) {
+    feedbackParts.push(`Moderator note: ${feedback}`);
+  }
+  const normalizedFeedback = feedbackParts.length > 0 ? feedbackParts.join('\n') : undefined;
 
 
   //  transaction to ensure both verification creation and report status update happen together
@@ -34,7 +50,7 @@ const verifyReport = async (moderatorId: string, payload: IVerifyReport) => {
         reportId,
         moderatorId,
         status,
-        feedback,
+        feedback: normalizedFeedback,
       },
     });
 
@@ -91,17 +107,106 @@ const verifyReport = async (moderatorId: string, payload: IVerifyReport) => {
 ;
 
 const getPendingReports = async () => {
-  return prisma.report.findMany({
+  const reports = await prisma.report.findMany({
     where: {
       status: 'SUBMITTED',
+    },
+    include: {
+      evidence: {
+        orderBy: {
+          createdAt: 'desc',
+        },
+      },
+      user: {
+        select: {
+          id: true,
+          _count: {
+            select: {
+              reports: true,
+            },
+          },
+        },
+      },
     },
     orderBy: {
       createdAt: 'desc',
     },
+  });
+
+  return reports.map((report) => {
+    const previousReportsCount = Math.max((report.user?._count.reports ?? 1) - 1, 0);
+    return {
+      ...report,
+      reporterInsight: {
+        previousReportsCount,
+        label:
+          previousReportsCount === 0
+            ? 'First time reporter'
+            : `Previous reports: ${previousReportsCount}`,
+      },
+    };
+  });
+};
+
+const getOverview = async (moderatorId: string) => {
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const [pendingCount, urgentPendingCount, approvedByMe, rejectedByMe, reviewedTodayByMe] =
+    await Promise.all([
+      prisma.report.count({ where: { status: 'SUBMITTED' } }),
+      prisma.report.count({
+        where: { status: 'SUBMITTED', severity: 'URGENT' },
+      }),
+      prisma.reportVerification.count({
+        where: { moderatorId, status: 'APPROVED' },
+      }),
+      prisma.reportVerification.count({
+        where: { moderatorId, status: 'REJECTED' },
+      }),
+      prisma.reportVerification.count({
+        where: {
+          moderatorId,
+          createdAt: {
+            gte: todayStart,
+          },
+        },
+      }),
+    ]);
+
+  return {
+    pendingCount,
+    urgentPendingCount,
+    approvedByMe,
+    rejectedByMe,
+    reviewedTodayByMe,
+  };
+};
+
+const getRecentDecisions = async (moderatorId: string) => {
+  return prisma.reportVerification.findMany({
+    where: { moderatorId },
+    include: {
+      report: {
+        select: {
+          id: true,
+          type: true,
+          severity: true,
+          location: true,
+          createdAt: true,
+        },
+      },
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    take: 30,
   });
 };
 
 export const VerificationService = {
   verifyReport,
   getPendingReports,
+  getOverview,
+  getRecentDecisions,
 };
