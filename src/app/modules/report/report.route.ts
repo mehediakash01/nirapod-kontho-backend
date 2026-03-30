@@ -47,6 +47,20 @@ router.patch(
   ReportController.assignNgoToReport
 );
 
+router.get(
+  '/:id/recommendations',
+  authenticate,
+  requireRole('SUPER_ADMIN'),
+  ReportController.getAssignmentRecommendations
+);
+
+router.get(
+  '/audit-logs/assignments',
+  authenticate,
+  requireRole('SUPER_ADMIN'),
+  ReportController.getAssignmentAuditLogs
+);
+
 // Admin/Moderator get all reports
 router.get(
   '/',

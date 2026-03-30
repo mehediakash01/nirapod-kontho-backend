@@ -50,4 +50,6 @@ export const updateReportStatusSchema = z.object({
 export const assignReportSchema = z.object({
   ngoId: z.string().min(1, 'ngoId is required'),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH']).optional(),
+  assignmentRationale: z.string().min(10, 'assignmentRationale must be at least 10 characters'),
+  confirmAssignment: z.literal(true),
 });

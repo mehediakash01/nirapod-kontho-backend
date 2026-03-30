@@ -43,7 +43,7 @@ const markAsRead = async (id: string, userId: string) => {
 // Helper to build notification messages consistently
 const buildVerificationMessage = (status: 'APPROVED' | 'REJECTED'): string => {
   return status === 'APPROVED'
-    ? 'Your report has been verified and a case has been created.'
+    ? 'Your report has been verified and is awaiting NGO assignment.'
     : 'Your report has been rejected.';
 };
 

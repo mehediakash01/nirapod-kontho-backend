@@ -3,6 +3,12 @@ export interface ICreateNGO {
   email: string;
   phone: string;
   address: string;
+  supportedReportTypes?: Array<
+    'HARASSMENT' | 'DOMESTIC_VIOLENCE' | 'STALKING' | 'CORRUPTION' | 'THREAT'
+  >;
+  coverageAreas?: string[];
+  maxActiveCases?: number;
+  priorityEscalationHours?: number;
   admin: {
     name: string;
     email: string;

@@ -78,11 +78,38 @@ const assignNgoToReport = catchAsync(async (req: Request, res: Response) => {
     throw new AppError('Invalid report id', 400);
   }
 
-  const result = await ReportService.assignNgoToReport(id, req.body);
+  const actorUserId = (req as any).user?.id as string | undefined;
+  const result = await ReportService.assignNgoToReport(id, req.body, actorUserId);
 
   sendResponse(res, {
     success: true,
     message: 'NGO assigned to report successfully',
+    data: result,
+  });
+});
+
+const getAssignmentRecommendations = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  if (!id || Array.isArray(id)) {
+    throw new AppError('Invalid report id', 400);
+  }
+
+  const result = await ReportService.getAssignmentRecommendations(id);
+
+  sendResponse(res, {
+    success: true,
+    message: 'Assignment recommendations fetched successfully',
+    data: result,
+  });
+});
+
+const getAssignmentAuditLogs = catchAsync(async (_req: Request, res: Response) => {
+  const result = await ReportService.getAssignmentAuditLogs();
+
+  sendResponse(res, {
+    success: true,
+    message: 'Assignment audit logs fetched successfully',
     data: result,
   });
 });
@@ -94,4 +121,6 @@ export const ReportController = {
   getPendingReports,
   updateReportStatus,
   assignNgoToReport,
+  getAssignmentRecommendations,
+  getAssignmentAuditLogs,
 };

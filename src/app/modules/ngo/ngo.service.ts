@@ -4,7 +4,17 @@ import { auth } from '../../config/auth';
 import { ICreateNGO, ISuperAdminAnalytics } from './ngo.interface';
 
 const createNgoWithAdmin = async (payload: ICreateNGO) => {
-  const { name, email, phone, address, admin } = payload;
+  const {
+    name,
+    email,
+    phone,
+    address,
+    supportedReportTypes,
+    coverageAreas,
+    maxActiveCases,
+    priorityEscalationHours,
+    admin,
+  } = payload;
 
   const existingNgo = await prisma.nGO.findUnique({
     where: { email },
@@ -36,6 +46,10 @@ const createNgoWithAdmin = async (payload: ICreateNGO) => {
           email,
           phone,
           address,
+          supportedReportTypes: supportedReportTypes ?? [],
+          coverageAreas: (coverageAreas ?? []).map((area) => area.trim()).filter(Boolean),
+          maxActiveCases: maxActiveCases ?? 20,
+          priorityEscalationHours: priorityEscalationHours ?? 24,
         },
       });
 

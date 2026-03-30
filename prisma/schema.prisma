@@ -133,12 +133,16 @@ model Verification {
 // NGO
 
 model NGO {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  phone     String
-  address   String
-  createdAt DateTime @default(now())
+  id                      String       @id @default(uuid())
+  name                    String
+  email                   String       @unique
+  phone                   String
+  address                 String
+  supportedReportTypes    ReportType[] @default([])
+  coverageAreas           String[]     @default([])
+  maxActiveCases          Int          @default(20)
+  priorityEscalationHours Int          @default(24)
+  createdAt               DateTime     @default(now())
 
   users User[]
   cases Case[]
@@ -262,4 +266,22 @@ model Donation {
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  actorUserId String?
+  category    String
+  action      String
+  entityType  String
+  entityId    String?
+  severity    String   @default("INFO")
+  message     String
+  rationale   String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([category])
+  @@index([entityType, entityId])
+  @@index([createdAt])
 }

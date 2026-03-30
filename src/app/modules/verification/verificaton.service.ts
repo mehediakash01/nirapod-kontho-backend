@@ -69,32 +69,8 @@ const verifyReport = async (moderatorId: string, payload: IVerifyReport) => {
     });
 
 
-    //  AUTO CREATE CASE IF APPROVED
+    // Keep approved reports unassigned until SUPER_ADMIN performs explicit NGO assignment.
     let caseData = null;
-
-    if (status === 'APPROVED') {
-      // find any NGO (simple version)
-   const ngo = await tx.nGO.findFirst({
-  orderBy: {
-    cases: {
-      _count: 'asc',
-    },
-  },
-});
-
-      if (!ngo) {
-        throw new AppError('No NGO available', 500);
-      }
-
-      caseData = await tx.case.create({
-        data: {
-          reportId,
-          assignedNgoId: ngo.id,
-          status: 'UNDER_REVIEW',
-          priority: 'HIGH',
-        },
-      });
-    }
 
     return {
       verification,
