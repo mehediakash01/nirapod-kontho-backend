@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { globalErrorHandler } from './app/middleware/globalErrorHandler';
 import { auth } from './app/config/auth';
+import { prisma } from './app/config/prisma';
 import { toNodeHandler } from 'better-auth/node';
 import { ReportRoutes } from './app/modules/report/report.route';
 import { VerificationRoutes } from './app/modules/verification/verification.route';
@@ -57,9 +58,70 @@ app.all('/api/auth/signin', (req, res) => {
   req.url = '/api/auth/sign-in/email';
   return authHandler(req, res);
 });
-app.all('/api/auth/session', (req, res) => {
-  req.url = '/api/auth/get-session';
-  return authHandler(req, res);
+
+// Custom session endpoint to ensure role is always returned
+app.get('/api/auth/session', async (req, res) => {
+  try {
+    // Prevent ALL caching - must always fetch fresh data
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.set('Surrogate-Control', 'no-store');
+    
+    // Log tab ID for debugging
+    const tabId = req.headers['x-tab-id'];
+    if (tabId) {
+      console.log(`[Session] Tab ID: ${tabId}`);
+    }
+
+    // Get session from better-auth - this reads from cookies
+    const session = await auth.api.getSession({
+      headers: req.headers,
+    });
+
+    if (!session || !session.user) {
+      return res.status(401).json({ error: 'No active session' });
+    }
+
+    // Verify session is not expired
+    if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
+      console.log(`[Session] Session expired for user ${session.user.id}`);
+      return res.status(401).json({ error: 'Session expired' });
+    }
+
+    // Fetch FRESH user data from database every time
+    const fullUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        image: true,
+        role: true,
+        emailVerified: true,
+      },
+    });
+
+    if (!fullUser) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+
+    console.log(`[Session] Valid session for user: ${fullUser.email} (${fullUser.role})`);
+
+    return res.status(200).json({
+      data: {
+        user: fullUser,
+        session: {
+          id: session.id,
+          expiresAt: session.expiresAt,
+        },
+      },
+      user: fullUser,
+    });
+  } catch (error: any) {
+    console.error('[Session] Error:', error.message);
+    return res.status(401).json({ error: 'Failed to retrieve session' });
+  }
 });
 
 // Rate limiter
