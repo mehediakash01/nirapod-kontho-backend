@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -60,7 +60,7 @@ app.all('/api/auth/signin', (req, res) => {
 });
 
 // Custom session endpoint to ensure role is always returned
-app.get('/api/auth/session', async (req, res) => {
+app.get('/api/auth/session', async (req: any, res: Response) => {
   try {
     // Prevent ALL caching - must always fetch fresh data
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
@@ -68,30 +68,36 @@ app.get('/api/auth/session', async (req, res) => {
     res.set('Expires', '0');
     res.set('Surrogate-Control', 'no-store');
     
-    // Log tab ID for debugging
-    const tabId = req.headers['x-tab-id'];
-    if (tabId) {
-      console.log(`[Session] Tab ID: ${tabId}`);
+    // Get session using headers directly
+    const headersObject: Record<string, string> = {};
+    if (req.headers.cookie) {
+      headersObject['cookie'] = req.headers.cookie;
+    }
+    if (req.headers.authorization) {
+      headersObject['authorization'] = req.headers.authorization;
     }
 
-    // Get session from better-auth - this reads from cookies
-    const session = await auth.api.getSession({
-      headers: req.headers,
-    });
+    const sessionResponse = await auth.api.getSession({
+      headers: headersObject,
+    } as any);
 
-    if (!session || !session.user) {
+    if (!sessionResponse || !sessionResponse.user) {
       return res.status(401).json({ error: 'No active session' });
     }
 
+    // Extract session data
+    const session = (sessionResponse as any).session || sessionResponse;
+    const user = sessionResponse.user;
+
     // Verify session is not expired
-    if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
-      console.log(`[Session] Session expired for user ${session.user.id}`);
+    if (session?.expiresAt && new Date((session as any).expiresAt) < new Date()) {
+      console.log(`[Session] Session expired for user ${user.id}`);
       return res.status(401).json({ error: 'Session expired' });
     }
 
     // Fetch FRESH user data from database every time
     const fullUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: user.id },
       select: {
         id: true,
         email: true,
@@ -112,8 +118,8 @@ app.get('/api/auth/session', async (req, res) => {
       data: {
         user: fullUser,
         session: {
-          id: session.id,
-          expiresAt: session.expiresAt,
+          id: (session as any)?.id || '',
+          expiresAt: (session as any)?.expiresAt,
         },
       },
       user: fullUser,
@@ -146,9 +152,38 @@ app.use('/api/oauth', OAuthRoutes);
 app.all('/api/auth', authHandler);
 app.all('/api/auth/*splat', authHandler);
 
+// Health check endpoint
+app.get('/health', async (req, res) => {
+  try {
+    // Test database connection
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV,
+    });
+  } catch (error: any) {
+    res.status(503).json({
+      status: 'error',
+      message: 'Database connection failed',
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
 // test route
 app.get('/', (req, res) => {
-  res.send(' Nirob kontho API is Running...');
+  res.send('Nirapod Kontho API is Running...');
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found',
+    path: req.path,
+  });
 });
 
 // global error handler
