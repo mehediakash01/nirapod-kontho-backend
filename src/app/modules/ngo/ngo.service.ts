@@ -127,7 +127,10 @@ const getAnalytics = async (): Promise<ISuperAdminAnalytics> => {
     prisma.donation.findMany({ where: { paymentStatus: 'SUCCESS' }, select: { amount: true } }),
   ]);
 
-  const totalSuccessfulDonations = donations.reduce((sum, donation) => sum + donation.amount, 0);
+  const totalSuccessfulDonations = donations.reduce(
+    (sum: number, donation: { amount: number }) => sum + donation.amount,
+    0
+  );
 
   return {
     totalNgos,

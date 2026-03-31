@@ -1,8 +1,34 @@
 import { prisma } from "../../config/prisma";
+import { Prisma } from '@prisma/client';
 import { buildQueryOptions } from "../../utils/queryBuilder";
 import { AppError } from '../../errors/AppError';
 
 import { ICreateReport } from "./report.interface";
+
+type NgoRecommendationSource = {
+  id: string;
+  name: string;
+  supportedReportTypes: string[];
+  coverageAreas: string[];
+  maxActiveCases: number;
+  priorityEscalationHours: number;
+  cases: Array<{
+    id: string;
+    status: string;
+  }>;
+};
+
+type AssignmentRecommendation = {
+  ngoId: string;
+  ngoName: string;
+  score: number;
+  reasons: string[];
+  activeCases: number;
+  maxActiveCases: number;
+  priorityEscalationHours: number;
+  typeMatched: boolean;
+  coverageMatched: boolean;
+};
 
 
 const createReport = async (userId: string, payload: ICreateReport) => {
@@ -141,7 +167,7 @@ const assignNgoToReport = async (
     throw new AppError('Only verified reports can be assigned to NGO', 400);
   }
 
-  const updatedCase = await prisma.$transaction(async (tx) => {
+  const updatedCase = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
     let caseRecord;
 
     if (report.case) {
@@ -222,19 +248,21 @@ const getAssignmentRecommendations = async (reportId: string) => {
 
   const location = report.location.toLowerCase();
 
-  const recommendations = ngos.map((ngo) => {
+  const recommendations = (ngos as NgoRecommendationSource[]).map((ngo: NgoRecommendationSource) => {
     const activeCases = ngo.cases.filter(
-      (item) => item.status === 'UNDER_REVIEW' || item.status === 'IN_PROGRESS'
+      (item: { id: string; status: string }) =>
+        item.status === 'UNDER_REVIEW' || item.status === 'IN_PROGRESS'
     ).length;
     const resolvedCases = ngo.cases.filter(
-      (item) => item.status === 'RESOLVED' || item.status === 'CLOSED'
+      (item: { id: string; status: string }) =>
+        item.status === 'RESOLVED' || item.status === 'CLOSED'
     ).length;
 
     const typeMatched =
       ngo.supportedReportTypes.length === 0 || ngo.supportedReportTypes.includes(report.type);
     const coverageMatched =
       ngo.coverageAreas.length === 0 ||
-      ngo.coverageAreas.some((area) => location.includes(area.toLowerCase()));
+      ngo.coverageAreas.some((area: string) => location.includes(area.toLowerCase()));
 
     const capacityRatio = Math.max(0, (ngo.maxActiveCases - activeCases) / Math.max(ngo.maxActiveCases, 1));
     const capacityScore = Math.round(capacityRatio * 30);
@@ -279,7 +307,9 @@ const getAssignmentRecommendations = async (reportId: string) => {
     };
   });
 
-  return recommendations.sort((a, b) => b.score - a.score);
+  return recommendations.sort(
+    (a: AssignmentRecommendation, b: AssignmentRecommendation) => b.score - a.score
+  );
 };
 
 const getAssignmentAuditLogs = async () => {
