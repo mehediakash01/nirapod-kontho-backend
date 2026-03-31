@@ -1,0 +1,9 @@
+{
+  "projectId": "prj_nirapod_kontho_backend",
+  "orgId": "team_nirapod",
+  "settings": {
+    "buildCommand": "npm run build",
+    "devCommand": "npm run dev",
+    "outputDirectory": "dist"
+  }
+}
