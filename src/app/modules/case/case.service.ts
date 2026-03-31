@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../errors/AppError";
 import { buildQueryOptions } from "../../utils/queryBuilder";
@@ -75,7 +76,7 @@ const updateCaseStatus = async (
     throw new AppError('Unauthorized to update this case', 403);
   }
 
-  const updatedCase = await prisma.$transaction(async (tx) => {
+  const updatedCase = await prisma.$transaction(async (tx:Prisma.TransactionClient) => {
     await tx.case.update({
       where: { id: caseId },
       data: {

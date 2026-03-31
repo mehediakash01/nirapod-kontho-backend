@@ -2,6 +2,7 @@ import { prisma } from '../../config/prisma';
 import { AppError } from '../../errors/AppError';
 import { auth } from '../../config/auth';
 import { ICreateNGO, ISuperAdminAnalytics } from './ngo.interface';
+import { Prisma } from '@prisma/client';
 
 const createNgoWithAdmin = async (payload: ICreateNGO) => {
   const {
@@ -38,7 +39,7 @@ const createNgoWithAdmin = async (payload: ICreateNGO) => {
   }
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. create NGO
       const ngo = await tx.nGO.create({
         data: {

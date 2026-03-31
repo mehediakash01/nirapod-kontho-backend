@@ -2,6 +2,7 @@ import { prisma } from "../../config/prisma";
 import { IVerifyReport } from './verification.interface';
 import { AppError } from '../../errors/AppError';
 import { NotificationService } from '../notification/notification.service';
+import { Prisma } from "@prisma/client";
 
 
 const verifyReport = async (moderatorId: string, payload: IVerifyReport) => {
@@ -25,7 +26,7 @@ const verifyReport = async (moderatorId: string, payload: IVerifyReport) => {
 
 
   //  transaction to ensure both verification creation and report status update happen together
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx:Prisma.TransactionClient) => {
 
 
   const report = await tx.report.findUnique({
