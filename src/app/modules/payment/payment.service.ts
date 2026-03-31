@@ -224,18 +224,20 @@ const getDonationDashboard = async () => {
     },
   });
 
+  type DonationWithUser = (typeof donations)[number];
+
   const totalAmount = donations
-    .filter((d) => d.paymentStatus === 'SUCCESS')
-    .reduce((sum, d) => sum + d.amount, 0);
+    .filter((d: DonationWithUser) => d.paymentStatus === 'SUCCESS')
+    .reduce((sum: number, d: DonationWithUser) => sum + d.amount, 0);
 
   const totalSuccessfulDonations = donations.filter(
-    (d) => d.paymentStatus === 'SUCCESS'
+    (d: DonationWithUser) => d.paymentStatus === 'SUCCESS'
   ).length;
   const totalPendingDonations = donations.filter(
-    (d) => d.paymentStatus === 'PENDING'
+    (d: DonationWithUser) => d.paymentStatus === 'PENDING'
   ).length;
   const totalFailedDonations = donations.filter(
-    (d) => d.paymentStatus === 'FAILED'
+    (d: DonationWithUser) => d.paymentStatus === 'FAILED'
   ).length;
 
   const now = new Date();
@@ -243,7 +245,7 @@ const getDonationDashboard = async () => {
   const month = now.getMonth();
 
   const thisMonthAmount = donations
-    .filter((d) => {
+    .filter((d: DonationWithUser) => {
       const dt = new Date(d.createdAt);
       return (
         d.paymentStatus === 'SUCCESS' &&
@@ -251,7 +253,7 @@ const getDonationDashboard = async () => {
         dt.getMonth() === month
       );
     })
-    .reduce((sum, d) => sum + d.amount, 0);
+    .reduce((sum: number, d: DonationWithUser) => sum + d.amount, 0);
 
   const monthlyMap = new Map<string, number>();
 
@@ -261,7 +263,7 @@ const getDonationDashboard = async () => {
     monthlyMap.set(key, 0);
   }
 
-  donations.forEach((d) => {
+  donations.forEach((d: DonationWithUser) => {
     if (d.paymentStatus !== 'SUCCESS') {
       return;
     }
@@ -279,10 +281,10 @@ const getDonationDashboard = async () => {
   }));
 
   const monthlySubscriptionPayments = donations.filter(
-    (d) => d.paymentStatus === 'SUCCESS' && d.transactionId.startsWith('in_')
+    (d: DonationWithUser) => d.paymentStatus === 'SUCCESS' && d.transactionId.startsWith('in_')
   ).length;
 
-  const recentTransactions = donations.slice(0, 20).map((donation) => ({
+  const recentTransactions = donations.slice(0, 20).map((donation: { id: any; amount: any; paymentStatus: any; transactionId: any; createdAt: any; user: any; }) => ({
     id: donation.id,
     amount: donation.amount,
     paymentStatus: donation.paymentStatus,

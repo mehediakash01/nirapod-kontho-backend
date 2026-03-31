@@ -25,7 +25,7 @@ const verifyReport = async (moderatorId: string, payload: IVerifyReport) => {
 
 
   //  transaction to ensure both verification creation and report status update happen together
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx: { report: { findUnique: (arg0: { where: { id: string; }; }) => any; update: (arg0: { where: { id: string; }; data: { status: string; }; }) => any; }; reportVerification: { findUnique: (arg0: { where: { reportId: string; }; }) => any; create: (arg0: { data: { reportId: string; moderatorId: string; status: "APPROVED" | "REJECTED"; feedback: string | undefined; }; }) => any; }; notification: { create: (arg0: { data: { userId: any; message: string; }; }) => any; }; }) => {
 
 
   const report = await tx.report.findUnique({
@@ -109,7 +109,7 @@ const getPendingReports = async () => {
     },
   });
 
-  return reports.map((report) => {
+  return reports.map((report: { user: { _count: { reports: any; }; }; }) => {
     const previousReportsCount = Math.max((report.user?._count.reports ?? 1) - 1, 0);
     return {
       ...report,
