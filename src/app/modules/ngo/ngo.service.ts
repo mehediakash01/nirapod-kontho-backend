@@ -38,7 +38,7 @@ const createNgoWithAdmin = async (payload: ICreateNGO) => {
   }
 
   try {
-    const result = await prisma.$transaction(async (tx: { nGO: { create: (arg0: { data: { name: string; email: string; phone: string; address: string; supportedReportTypes: ("HARASSMENT" | "DOMESTIC_VIOLENCE" | "STALKING" | "CORRUPTION" | "THREAT")[]; coverageAreas: string[]; maxActiveCases: number; priorityEscalationHours: number; }; }) => any; }; user: { update: (arg0: { where: { id: string; }; data: { role: string; ngoId: any; }; }) => any; }; }) => {
+    const result = await prisma.$transaction(async (tx) => {
       // 1. create NGO
       const ngo = await tx.nGO.create({
         data: {
