@@ -23,12 +23,16 @@ const gracefulShutdown = async () => {
 process.on('SIGTERM', gracefulShutdown);
 process.on('SIGINT', gracefulShutdown);
 
-// Start server
-const server = app.listen(PORT, () => {
-  console.log(`✓ Server running on port ${PORT}`);
-  console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`✓ Better Auth URL: ${process.env.BETTER_AUTH_URL}`);
-});
+const isVercelRuntime = Boolean(process.env.VERCEL);
+
+if (!isVercelRuntime) {
+  // Local/dev runtime should start an HTTP listener.
+  app.listen(PORT, () => {
+    console.log(`✓ Server running on port ${PORT}`);
+    console.log(`✓ Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`✓ Better Auth URL: ${process.env.BETTER_AUTH_URL}`);
+  });
+}
 
 // Handle unhandled errors
 process.on('uncaughtException', (error) => {
