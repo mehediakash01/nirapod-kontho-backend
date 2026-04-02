@@ -2104,7 +2104,7 @@ var oauth_session_default = router9;
 var app = express7();
 var authHandler = toNodeHandler(auth);
 var normalizeOrigin = (origin) => origin?.trim().replace(/\/$/, "");
-var vercelFrontendPattern = /^https:\/\/nirapod-kontho-frontend(?:-[a-z0-9-]+)?\.vercel\.app$/;
+var frontendOriginPattern = /^https:\/\/nirapod-kontho-frontend(?:-[a-z0-9-]+)?\.vercel\.app$/;
 var allowedOrigins = new Set(
   [
     process.env.FRONTEND_URL,
@@ -2120,7 +2120,7 @@ var corsOptions = {
       callback(null, true);
       return;
     }
-    if (allowedOrigins.has(normalizedOrigin) || vercelFrontendPattern.test(normalizedOrigin)) {
+    if (allowedOrigins.has(normalizedOrigin) || frontendOriginPattern.test(normalizedOrigin)) {
       callback(null, true);
       return;
     }
@@ -2138,7 +2138,7 @@ app.post(
 );
 app.use(express7.json());
 app.use(cors(corsOptions));
-app.options("*", cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 app.use(helmet());
 app.use(morgan("dev"));
 app.all("/api/auth/signup", (req, res) => {

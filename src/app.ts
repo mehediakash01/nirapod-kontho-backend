@@ -23,7 +23,7 @@ const app = express();
 const authHandler = toNodeHandler(auth);
 
 const normalizeOrigin = (origin?: string) => origin?.trim().replace(/\/$/, '');
-const vercelFrontendPattern = /^https:\/\/nirapod-kontho-frontend(?:-[a-z0-9-]+)?\.vercel\.app$/;
+const frontendOriginPattern = /^https:\/\/nirapod-kontho-frontend(?:-[a-z0-9-]+)?\.vercel\.app$/;
 const allowedOrigins = new Set(
   [
     process.env.FRONTEND_URL,
@@ -44,7 +44,7 @@ const corsOptions: cors.CorsOptions = {
       return;
     }
 
-    if (allowedOrigins.has(normalizedOrigin) || vercelFrontendPattern.test(normalizedOrigin)) {
+    if (allowedOrigins.has(normalizedOrigin) || frontendOriginPattern.test(normalizedOrigin)) {
       callback(null, true);
       return;
     }
@@ -69,7 +69,7 @@ app.post(
 // middlewares
 app.use(express.json());
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 app.use(helmet());
 app.use(morgan('dev'));
 app.all('/api/auth/signup', (req, res) => {
