@@ -1,4 +1,4 @@
-import express, { Response } from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -21,6 +21,23 @@ import OAuthSessionRoutes from './app/modules/oauth/oauth.session';
 
 const app = express();
 const authHandler = toNodeHandler(auth);
+
+const buildForwardedHeaders = (req: Request) => {
+  const headers = new Headers();
+
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (Array.isArray(value)) {
+      value.forEach((item) => headers.append(key, item));
+      continue;
+    }
+
+    if (typeof value === 'string') {
+      headers.set(key, value);
+    }
+  }
+
+  return headers;
+};
 
 const normalizeOrigin = (origin?: string) => origin?.trim().replace(/\/$/, '');
 const frontendOriginPattern = /^https:\/\/nirapod-kontho-frontend(?:-[a-z0-9-]+)?\.vercel\.app$/;
@@ -89,26 +106,40 @@ app.all('/api/auth/signin', (req, res) => {
 });
 
 // Custom session endpoint to ensure role is always returned
-app.get('/api/auth/session', async (req: any, res: Response) => {
+app.get('/api/auth/session', async (req: Request, res: Response) => {
   try {
     // Prevent ALL caching - must always fetch fresh data
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
     res.set('Pragma', 'no-cache');
     res.set('Expires', '0');
     res.set('Surrogate-Control', 'no-store');
-    
-    // Get session using headers directly
-    const headersObject: Record<string, string> = {};
-    if (req.headers.cookie) {
-      headersObject['cookie'] = req.headers.cookie;
-    }
-    if (req.headers.authorization) {
-      headersObject['authorization'] = req.headers.authorization;
+
+    const sessionResult = await (auth.api.getSession as any)({
+      method: 'GET',
+      headers: buildForwardedHeaders(req),
+      query: req.query as Record<string, string>,
+      asResponse: false,
+      returnHeaders: true,
+    } as any).catch(() => null);
+
+    if (!sessionResult?.response) {
+      return res.status(401).json({ error: 'No active session' });
     }
 
-    const sessionResponse = await auth.api.getSession({
-      headers: headersObject,
-    } as any);
+    const setCookie = sessionResult.headers?.getSetCookie?.() ?? [];
+    if (setCookie.length > 0) {
+      res.setHeader('Set-Cookie', setCookie);
+    }
+
+    sessionResult.headers?.forEach((value: string, key: string) => {
+      if (key.toLowerCase() === 'set-cookie') {
+        return;
+      }
+
+      res.setHeader(key, value);
+    });
+
+    const sessionResponse = sessionResult.response;
 
     if (!sessionResponse || !sessionResponse.user) {
       return res.status(401).json({ error: 'No active session' });
