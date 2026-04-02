@@ -2230,7 +2230,7 @@ app.use(globalErrorHandler);
 var app_default = app;
 
 // src/server.ts
-dotenv.config();
+dotenv.config({ quiet: true });
 var PORT = process.env.PORT || 5e3;
 var gracefulShutdown = async () => {
   console.log("Gracefully shutting down...");
@@ -2261,3 +2261,7 @@ process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
   process.exit(1);
 });
+var server_default = app_default;
+export {
+  server_default as default
+};
