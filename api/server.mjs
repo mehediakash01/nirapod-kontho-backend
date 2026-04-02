@@ -2103,28 +2103,42 @@ var oauth_session_default = router9;
 // src/app.ts
 var app = express7();
 var authHandler = toNodeHandler(auth);
+var normalizeOrigin = (origin) => origin?.trim().replace(/\/$/, "");
+var vercelFrontendPattern = /^https:\/\/nirapod-kontho-frontend(?:-[a-z0-9-]+)?\.vercel\.app$/;
+var allowedOrigins = new Set(
+  [
+    process.env.FRONTEND_URL,
+    process.env.CLIENT_URL,
+    "https://nirapod-kontho-frontend.vercel.app",
+    "http://localhost:3000"
+  ].map((origin) => normalizeOrigin(origin)).filter((origin) => Boolean(origin))
+);
+var corsOptions = {
+  origin: (origin, callback) => {
+    const normalizedOrigin = normalizeOrigin(origin);
+    if (!normalizedOrigin) {
+      callback(null, true);
+      return;
+    }
+    if (allowedOrigins.has(normalizedOrigin) || vercelFrontendPattern.test(normalizedOrigin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error("Not allowed by CORS"));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 204
+};
 app.post(
   "/api/payments/webhook",
   express7.raw({ type: "application/json" }),
   PaymentController.handleWebhook
 );
 app.use(express7.json());
-var allowedOrigins = [
-  process.env.FRONTEND_URL || "http://localhost:3000",
-  "http://localhost:3000"
-];
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-        return;
-      }
-      callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true
-  })
-);
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(helmet());
 app.use(morgan("dev"));
 app.all("/api/auth/signup", (req, res) => {
