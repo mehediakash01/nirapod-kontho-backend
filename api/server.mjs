@@ -46,8 +46,10 @@ if (process.env.NODE_ENV !== "production") {
 var auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
   trustedOrigins: [
-    process.env.FRONTEND_URL || "http://localhost:3000",
+    process.env.FRONTEND_URL || "https://nirapod-kontho-frontend.vercel.app",
+    process.env.CLIENT_URL || "https://nirapod-kontho-frontend.vercel.app",
     process.env.BETTER_AUTH_URL || "http://localhost:5000",
+    "https://nirapod-kontho-frontend.vercel.app",
     "http://localhost:3000",
     "http://localhost:5000"
   ],
@@ -2096,28 +2098,47 @@ var oauth_session_default = router9;
 // src/app.ts
 var app = express7();
 var authHandler = toNodeHandler(auth);
+var vercelFrontendOriginPattern = /^https:\/\/nirapod-kontho-frontend(?:-[a-z0-9-]+)?\.vercel\.app$/;
+var allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.CLIENT_URL,
+  "https://nirapod-kontho-frontend.vercel.app",
+  "http://localhost:3000"
+].filter((origin) => Boolean(origin));
+var isAllowedOrigin = (origin) => {
+  if (!origin) {
+    return true;
+  }
+  if (allowedOrigins.includes(origin)) {
+    return true;
+  }
+  const allowPreviewOrigins = process.env.ALLOW_VERCEL_PREVIEW_ORIGINS === "true";
+  if (allowPreviewOrigins && vercelFrontendOriginPattern.test(origin)) {
+    return true;
+  }
+  return false;
+};
 app.post(
   "/api/payments/webhook",
   express7.raw({ type: "application/json" }),
   PaymentController.handleWebhook
 );
 app.use(express7.json());
-var allowedOrigins = [
-  process.env.FRONTEND_URL || "http://localhost:3000",
-  "http://localhost:3000"
-];
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (isAllowedOrigin(origin)) {
         callback(null, true);
         return;
       }
       callback(new Error("Not allowed by CORS"));
     },
-    credentials: true
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
   })
 );
+app.options("*", cors());
 app.use(helmet());
 app.use(morgan("dev"));
 app.all("/api/auth/signup", (req, res) => {
