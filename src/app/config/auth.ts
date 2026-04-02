@@ -2,7 +2,14 @@ import { betterAuth } from 'better-auth';
 import { prismaAdapter } from '@better-auth/prisma-adapter';
 import { prisma } from './prisma';
 
+const betterAuthSecret = process.env.BETTER_AUTH_SECRET?.replace(/^BETTER_AUTH_SECRET=/, '');
+
+if (process.env.NODE_ENV === 'production' && !betterAuthSecret) {
+  throw new Error('Missing BETTER_AUTH_SECRET in environment variables');
+}
+
 export const auth = betterAuth({
+  secret: betterAuthSecret,
   baseURL: process.env.BETTER_AUTH_URL,
   trustedOrigins: [
     process.env.FRONTEND_URL || 'https://nirapod-kontho-frontend.vercel.app',

@@ -22,32 +22,6 @@ import OAuthSessionRoutes from './app/modules/oauth/oauth.session';
 const app = express();
 const authHandler = toNodeHandler(auth);
 
-const vercelFrontendOriginPattern =
-  /^https:\/\/nirapod-kontho-frontend(?:-[a-z0-9-]+)?\.vercel\.app$/;
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  process.env.CLIENT_URL,
-  'https://nirapod-kontho-frontend.vercel.app',
-  'http://localhost:3000',
-].filter((origin): origin is string => Boolean(origin));
-
-const isAllowedOrigin = (origin?: string) => {
-  if (!origin) {
-    return true;
-  }
-
-  if (allowedOrigins.includes(origin)) {
-    return true;
-  }
-
-  const allowPreviewOrigins = process.env.ALLOW_VERCEL_PREVIEW_ORIGINS === 'true';
-  if (allowPreviewOrigins && vercelFrontendOriginPattern.test(origin)) {
-    return true;
-  }
-
-  return false;
-};
-
 // Stripe webhook must use raw body and be mounted before express.json()
 app.post(
   '/api/payments/webhook',
@@ -55,24 +29,27 @@ app.post(
   PaymentController.handleWebhook
 );
 
+
+
 // middlewares
 app.use(express.json());
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'http://localhost:3000',
+  'http://localhost:3000',
+];
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (isAllowedOrigin(origin)) {
+      if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
         return;
       }
       callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
-app.options('*', cors());
 app.use(helmet());
 app.use(morgan('dev'));
 app.all('/api/auth/signup', (req, res) => {

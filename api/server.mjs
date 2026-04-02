@@ -43,7 +43,12 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 // src/app/config/auth.ts
+var betterAuthSecret = process.env.BETTER_AUTH_SECRET?.replace(/^BETTER_AUTH_SECRET=/, "");
+if (process.env.NODE_ENV === "production" && !betterAuthSecret) {
+  throw new Error("Missing BETTER_AUTH_SECRET in environment variables");
+}
 var auth = betterAuth({
+  secret: betterAuthSecret,
   baseURL: process.env.BETTER_AUTH_URL,
   trustedOrigins: [
     process.env.FRONTEND_URL || "https://nirapod-kontho-frontend.vercel.app",
@@ -2098,47 +2103,28 @@ var oauth_session_default = router9;
 // src/app.ts
 var app = express7();
 var authHandler = toNodeHandler(auth);
-var vercelFrontendOriginPattern = /^https:\/\/nirapod-kontho-frontend(?:-[a-z0-9-]+)?\.vercel\.app$/;
-var allowedOrigins = [
-  process.env.FRONTEND_URL,
-  process.env.CLIENT_URL,
-  "https://nirapod-kontho-frontend.vercel.app",
-  "http://localhost:3000"
-].filter((origin) => Boolean(origin));
-var isAllowedOrigin = (origin) => {
-  if (!origin) {
-    return true;
-  }
-  if (allowedOrigins.includes(origin)) {
-    return true;
-  }
-  const allowPreviewOrigins = process.env.ALLOW_VERCEL_PREVIEW_ORIGINS === "true";
-  if (allowPreviewOrigins && vercelFrontendOriginPattern.test(origin)) {
-    return true;
-  }
-  return false;
-};
 app.post(
   "/api/payments/webhook",
   express7.raw({ type: "application/json" }),
   PaymentController.handleWebhook
 );
 app.use(express7.json());
+var allowedOrigins = [
+  process.env.FRONTEND_URL || "http://localhost:3000",
+  "http://localhost:3000"
+];
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (isAllowedOrigin(origin)) {
+      if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
         return;
       }
       callback(new Error("Not allowed by CORS"));
     },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"]
+    credentials: true
   })
 );
-app.options("*", cors());
 app.use(helmet());
 app.use(morgan("dev"));
 app.all("/api/auth/signup", (req, res) => {
@@ -2276,11 +2262,15 @@ if (!isVercelRuntime) {
 }
 process.on("uncaughtException", (error) => {
   console.error("Uncaught Exception:", error);
-  process.exit(1);
+  if (!isVercelRuntime) {
+    process.exit(1);
+  }
 });
 process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
-  process.exit(1);
+  if (!isVercelRuntime) {
+    process.exit(1);
+  }
 });
 var server_default = app_default;
 export {
