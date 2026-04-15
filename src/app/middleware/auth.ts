@@ -7,19 +7,41 @@ export const authenticate = async (req: any, res: any, next: any) => {
     headers: req.headers,
   });
 
-  if (!session) {
+  if (session) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+    });
+
+    req.user = user;
+    next();
+    return;
+  }
+
+  const cookies = req.headers.cookie || '';
+  const authTokenMatch = cookies.match(/auth-token=([^;]+)/);
+  const sessionTokenMatch = cookies.match(/better-auth\.session_token=([^;]+)/);
+  const token = authTokenMatch?.[1] || sessionTokenMatch?.[1];
+
+  if (!token) {
     return res.status(401).json({
       success: false,
       message: 'Unauthorized',
     });
   }
 
-  //  fetch full user (with role)
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
+  const legacySession = await prisma.session.findUnique({
+    where: { token },
+    include: { user: true },
   });
 
-  req.user = user;
+  if (!legacySession || legacySession.expiresAt < new Date()) {
+    return res.status(401).json({
+      success: false,
+      message: 'Unauthorized',
+    });
+  }
+
+  req.user = legacySession.user;
 
   next();
 };

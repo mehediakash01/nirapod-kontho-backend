@@ -2,6 +2,13 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../../config/prisma';
 
 const router = Router();
+const isProduction = process.env.NODE_ENV === 'production';
+const authCookieOptions = {
+  httpOnly: true,
+  sameSite: isProduction ? ('none' as const) : ('lax' as const),
+  secure: isProduction,
+  path: '/',
+};
 
 // Session endpoint to retrieve user from session token
 router.get('/session', async (req: Request, res: Response) => {
@@ -56,6 +63,27 @@ router.get('/session', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Session endpoint error:', error.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/sign-out', async (req: Request, res: Response) => {
+  try {
+    const cookies = req.headers.cookie || '';
+    const authTokenMatch = cookies.match(/auth-token=([^;]+)/);
+    const sessionTokenMatch = cookies.match(/better-auth\.session_token=([^;]+)/);
+    const token = authTokenMatch?.[1] || sessionTokenMatch?.[1];
+
+    if (token) {
+      await prisma.session.deleteMany({ where: { token } });
+    }
+
+    res.clearCookie('auth-token', authCookieOptions);
+    res.clearCookie('better-auth.session_token', authCookieOptions);
+
+    return res.status(200).json({ success: true });
+  } catch (error: any) {
+    console.error('Sign-out endpoint error:', error.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -1,5 +1,4 @@
 {
-  "terminal.integrated.enableBell": false,
   "terminal.integrated.defaultProfile.windows": "Git Bash",
   "terminal.integrated.persistentSessionReviveProcess": "never",
   "terminal.integrated.enablePersistentSessions": false,
@@ -10,5 +9,6 @@
   "accessibility.signals.terminalBell": {
     "sound": "off"
   },
-  "accessibility.signals.progress": "off"
+  "accessibility.signals.progress": "off",
+  "terminal.integrated.enableVisualBell": false
 }
