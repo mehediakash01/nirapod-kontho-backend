@@ -1,5 +1,5 @@
 // src/server.ts
-import dotenv from "dotenv";
+import "dotenv/config";
 
 // src/app.ts
 import express7 from "express";
@@ -23,6 +23,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "@better-auth/prisma-adapter";
 
 // src/app/config/prisma.ts
+import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 var globalForPrisma = globalThis;
@@ -61,6 +62,13 @@ var auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql"
   }),
+  advanced: {
+    useSecureCookies: true,
+    defaultCookieAttributes: {
+      sameSite: "none",
+      secure: true
+    }
+  },
   emailAndPassword: {
     enabled: true
   },
@@ -92,21 +100,101 @@ import { toNodeHandler } from "better-auth/node";
 // src/app/modules/report/report.route.ts
 import express from "express";
 
+// src/app/modules/oauth/oauth.cookies.ts
+var isProduction = process.env.NODE_ENV === "production";
+var sessionDurationMs = 7 * 24 * 60 * 60 * 1e3;
+var oauthCookieOptions = {
+  httpOnly: true,
+  sameSite: isProduction ? "none" : "lax",
+  secure: isProduction,
+  path: "/",
+  ...isProduction ? { partitioned: true, priority: "high" } : {}
+};
+var persistentOauthCookieOptions = {
+  ...oauthCookieOptions,
+  maxAge: sessionDurationMs
+};
+var managedCookieNames = [
+  "auth-token",
+  "better-auth.session_token",
+  "__Secure-better-auth.session_token"
+];
+var parseCookies = (cookieHeader) => cookieHeader.split(";").reduce((acc, cookie) => {
+  const [rawName, ...rawValueParts] = cookie.trim().split("=");
+  if (!rawName || rawValueParts.length === 0) {
+    return acc;
+  }
+  const value = rawValueParts.join("=");
+  try {
+    acc[rawName] = decodeURIComponent(value);
+  } catch {
+    acc[rawName] = value;
+  }
+  return acc;
+}, {});
+var getLegacySessionToken = (req) => {
+  const cookies = parseCookies(req.headers.cookie || "");
+  return cookies["auth-token"] || null;
+};
+var setLegacySessionCookie = (res, token) => {
+  res.cookie("auth-token", token, persistentOauthCookieOptions);
+};
+var clearManagedSessionCookies = (res) => {
+  for (const cookieName of managedCookieNames) {
+    res.clearCookie(cookieName, oauthCookieOptions);
+  }
+};
+var applyNoStoreHeaders = (res) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
+  res.set("Pragma", "no-cache");
+  res.set("Expires", "0");
+  res.set("Surrogate-Control", "no-store");
+};
+
 // src/app/middleware/auth.ts
+var buildForwardedHeaders = (req) => {
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (Array.isArray(value)) {
+      value.forEach((item) => headers.append(key, item));
+      continue;
+    }
+    if (typeof value === "string") {
+      headers.set(key, value);
+    }
+  }
+  return headers;
+};
 var authenticate = async (req, res, next) => {
   const session = await auth.api.getSession({
-    headers: req.headers
-  });
-  if (!session) {
+    headers: buildForwardedHeaders(req)
+  }).catch(() => null);
+  if (session) {
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id }
+    });
+    req.user = user;
+    next();
+    return;
+  }
+  const token = getLegacySessionToken(req);
+  if (!token) {
     return res.status(401).json({
       success: false,
       message: "Unauthorized"
     });
   }
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id }
+  const legacySession = await prisma.session.findUnique({
+    where: { token },
+    include: { user: true }
   });
-  req.user = user;
+  if (!legacySession || legacySession.expiresAt < /* @__PURE__ */ new Date()) {
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized"
+    });
+  }
+  req.user = legacySession.user;
   next();
 };
 var requireRole = (...roles) => {
@@ -1907,12 +1995,7 @@ router8.get("/google", async (req, res) => {
     if (cachedAuth && Date.now() - cachedAuth.timestamp < 10 * 60 * 1e3) {
       console.log("\u267B\uFE0F Code already processed, reusing session token:", code.substring(0, 20) + "...");
       const frontendUrl2 = process.env.FRONTEND_URL || "http://localhost:3000";
-      const maxAgeMs2 = 7 * 24 * 60 * 60 * 1e3;
-      res.cookie("auth-token", cachedAuth.sessionToken, {
-        httpOnly: true,
-        sameSite: "lax",
-        maxAge: maxAgeMs2
-      });
+      setLegacySessionCookie(res, cachedAuth.sessionToken);
       return res.redirect(`${frontendUrl2}/dashboard?oauth_success=true`);
     }
     console.log("\u{1F535} Processing OAuth callback for Google with code:", code.substring(0, 20) + "...");
@@ -1953,12 +2036,7 @@ router8.get("/google", async (req, res) => {
         if (recentSession) {
           console.log("\u2705 Found recent session for this auth attempt, reusing...");
           const frontendUrl2 = process.env.FRONTEND_URL || "http://localhost:3000";
-          const maxAgeMs2 = 7 * 24 * 60 * 60 * 1e3;
-          res.cookie("auth-token", recentSession.token, {
-            httpOnly: true,
-            sameSite: "lax",
-            maxAge: maxAgeMs2
-          });
+          setLegacySessionCookie(res, recentSession.token);
           return res.redirect(`${frontendUrl2}/dashboard?oauth_success=true`);
         }
         throw tokenError;
@@ -2030,12 +2108,7 @@ router8.get("/google", async (req, res) => {
       }
     }
     console.log("\u{1F36A} Setting session cookie...");
-    const maxAgeMs = 7 * 24 * 60 * 60 * 1e3;
-    res.cookie("auth-token", sessionToken, {
-      httpOnly: true,
-      sameSite: "lax",
-      maxAge: maxAgeMs
-    });
+    setLegacySessionCookie(res, sessionToken);
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
     console.log("\u{1F3AF} Redirecting to:", `${frontendUrl}/dashboard?oauth_success=true`);
     return res.redirect(`${frontendUrl}/dashboard?oauth_success=true`);
@@ -2055,39 +2128,98 @@ var oauth_callback_default = router8;
 // src/app/modules/oauth/oauth.session.ts
 import { Router as Router3 } from "express";
 var router9 = Router3();
+var buildForwardedHeaders2 = (req) => {
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (Array.isArray(value)) {
+      value.forEach((item) => headers.append(key, item));
+      continue;
+    }
+    if (typeof value === "string") {
+      headers.set(key, value);
+    }
+  }
+  return headers;
+};
+var resolveBetterAuthSession = async (req, res) => {
+  const sessionResult = await auth.api.getSession({
+    method: "GET",
+    headers: buildForwardedHeaders2(req),
+    query: req.query,
+    asResponse: false,
+    returnHeaders: true
+  }).catch(() => null);
+  if (!sessionResult?.response?.user) {
+    return null;
+  }
+  const setCookie = sessionResult.headers?.getSetCookie?.() ?? [];
+  if (setCookie.length > 0) {
+    res.setHeader("Set-Cookie", setCookie);
+  }
+  sessionResult.headers?.forEach((value, key) => {
+    if (key.toLowerCase() === "set-cookie") {
+      return;
+    }
+    res.setHeader(key, value);
+  });
+  return sessionResult.response;
+};
+var selectUserPayload = {
+  id: true,
+  email: true,
+  name: true,
+  image: true,
+  role: true,
+  emailVerified: true
+};
 router9.get("/session", async (req, res) => {
   try {
-    const cookies = req.headers.cookie || "";
-    const authTokenMatch = cookies.match(/auth-token=([^;]+)/);
-    const sessionTokenMatch = cookies.match(/better-auth\.session_token=([^;]+)/);
-    const token = authTokenMatch?.[1] || sessionTokenMatch?.[1];
+    applyNoStoreHeaders(res);
+    const betterAuthSession = await resolveBetterAuthSession(req, res);
+    if (betterAuthSession?.user?.id) {
+      const session2 = betterAuthSession.session || betterAuthSession;
+      const fullUser = await prisma.user.findUnique({
+        where: { id: betterAuthSession.user.id },
+        select: selectUserPayload
+      });
+      if (!fullUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      if (session2?.expiresAt && new Date(session2.expiresAt) < /* @__PURE__ */ new Date()) {
+        return res.status(401).json({ error: "Session expired" });
+      }
+      return res.status(200).json({
+        user: fullUser,
+        session: {
+          id: session2?.id || "",
+          expiresAt: session2?.expiresAt
+        }
+      });
+    }
+    const token = getLegacySessionToken(req);
     if (!token) {
       return res.status(401).json({ error: "No session token found" });
     }
-    console.log("Looking up session with token:", token.substring(0, 20) + "...");
+    console.log("Looking up legacy OAuth session with token:", token.substring(0, 20) + "...");
     const session = await prisma.session.findUnique({
       where: { token },
-      include: { user: true }
+      include: {
+        user: {
+          select: selectUserPayload
+        }
+      }
     });
     if (!session) {
-      console.log("Session not found");
+      console.log("Legacy OAuth session not found");
       return res.status(401).json({ error: "Session not found" });
     }
     if (session.expiresAt < /* @__PURE__ */ new Date()) {
-      console.log("Session expired");
+      console.log("Legacy OAuth session expired");
       await prisma.session.delete({ where: { id: session.id } });
       return res.status(401).json({ error: "Session expired" });
     }
-    console.log("Session found for user:", session.user.email);
     return res.status(200).json({
-      user: {
-        id: session.user.id,
-        email: session.user.email,
-        name: session.user.name,
-        image: session.user.image,
-        role: session.user.role,
-        emailVerified: session.user.emailVerified
-      },
+      user: session.user,
       session: {
         id: session.id,
         expiresAt: session.expiresAt
@@ -2098,11 +2230,43 @@ router9.get("/session", async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+router9.post("/sign-out", async (req, res) => {
+  try {
+    const token = getLegacySessionToken(req);
+    if (token) {
+      await prisma.session.deleteMany({ where: { token } });
+    }
+    const betterAuthSession = await resolveBetterAuthSession(req, res);
+    const betterAuthSessionId = betterAuthSession?.session?.id;
+    if (betterAuthSessionId) {
+      await prisma.session.deleteMany({ where: { id: betterAuthSessionId } });
+    }
+    clearManagedSessionCookies(res);
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("Sign-out endpoint error:", error.message);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
 var oauth_session_default = router9;
 
 // src/app.ts
 var app = express7();
+app.set("trust proxy", 1);
 var authHandler = toNodeHandler(auth);
+var buildForwardedHeaders3 = (req) => {
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (Array.isArray(value)) {
+      value.forEach((item) => headers.append(key, item));
+      continue;
+    }
+    if (typeof value === "string") {
+      headers.set(key, value);
+    }
+  }
+  return headers;
+};
 var normalizeOrigin = (origin) => origin?.trim().replace(/\/$/, "");
 var frontendOriginPattern = /^https:\/\/nirapod-kontho-frontend(?:-[a-z0-9-]+)?\.vercel\.app$/;
 var allowedOrigins = new Set(
@@ -2128,7 +2292,14 @@ var corsOptions = {
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "Cache-Control",
+    "Pragma",
+    "Expires",
+    "X-Tab-ID"
+  ],
   optionsSuccessStatus: 204
 };
 app.post(
@@ -2155,16 +2326,27 @@ app.get("/api/auth/session", async (req, res) => {
     res.set("Pragma", "no-cache");
     res.set("Expires", "0");
     res.set("Surrogate-Control", "no-store");
-    const headersObject = {};
-    if (req.headers.cookie) {
-      headersObject["cookie"] = req.headers.cookie;
+    const sessionResult = await auth.api.getSession({
+      method: "GET",
+      headers: buildForwardedHeaders3(req),
+      query: req.query,
+      asResponse: false,
+      returnHeaders: true
+    }).catch(() => null);
+    if (!sessionResult?.response) {
+      return res.status(401).json({ error: "No active session" });
     }
-    if (req.headers.authorization) {
-      headersObject["authorization"] = req.headers.authorization;
+    const setCookie = sessionResult.headers?.getSetCookie?.() ?? [];
+    if (setCookie.length > 0) {
+      res.setHeader("Set-Cookie", setCookie);
     }
-    const sessionResponse = await auth.api.getSession({
-      headers: headersObject
+    sessionResult.headers?.forEach((value, key) => {
+      if (key.toLowerCase() === "set-cookie") {
+        return;
+      }
+      res.setHeader(key, value);
     });
+    const sessionResponse = sessionResult.response;
     if (!sessionResponse || !sessionResponse.user) {
       return res.status(401).json({ error: "No active session" });
     }
@@ -2251,7 +2433,6 @@ app.use(globalErrorHandler);
 var app_default = app;
 
 // src/server.ts
-dotenv.config({ quiet: true });
 var PORT = process.env.PORT || 5e3;
 var gracefulShutdown = async () => {
   console.log("Gracefully shutting down...");

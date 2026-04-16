@@ -20,6 +20,7 @@ import OAuthSessionRoutes from './app/modules/oauth/oauth.session';
 
 
 const app = express();
+app.set('trust proxy', 1);
 const authHandler = toNodeHandler(auth);
 
 const buildForwardedHeaders = (req: Request) => {

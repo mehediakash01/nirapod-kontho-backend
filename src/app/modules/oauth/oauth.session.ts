@@ -1,61 +1,130 @@
 import { Router, Request, Response } from 'express';
+import { auth } from '../../config/auth';
 import { prisma } from '../../config/prisma';
+import {
+  applyNoStoreHeaders,
+  clearManagedSessionCookies,
+  getLegacySessionToken,
+} from './oauth.cookies';
 
 const router = Router();
-const isProduction = process.env.NODE_ENV === 'production';
-const authCookieOptions = {
-  httpOnly: true,
-  sameSite: isProduction ? ('none' as const) : ('lax' as const),
-  secure: isProduction,
-  path: '/',
+
+const buildForwardedHeaders = (req: Request) => {
+  const headers = new Headers();
+
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (Array.isArray(value)) {
+      value.forEach((item) => headers.append(key, item));
+      continue;
+    }
+
+    if (typeof value === 'string') {
+      headers.set(key, value);
+    }
+  }
+
+  return headers;
 };
+
+const resolveBetterAuthSession = async (req: Request, res: Response) => {
+  const sessionResult = await (auth.api.getSession as any)({
+    method: 'GET',
+    headers: buildForwardedHeaders(req),
+    query: req.query as Record<string, string>,
+    asResponse: false,
+    returnHeaders: true,
+  } as any).catch(() => null);
+
+  if (!sessionResult?.response?.user) {
+    return null;
+  }
+
+  const setCookie = sessionResult.headers?.getSetCookie?.() ?? [];
+  if (setCookie.length > 0) {
+    res.setHeader('Set-Cookie', setCookie);
+  }
+
+  sessionResult.headers?.forEach((value: string, key: string) => {
+    if (key.toLowerCase() === 'set-cookie') {
+      return;
+    }
+
+    res.setHeader(key, value);
+  });
+
+  return sessionResult.response;
+};
+
+const selectUserPayload = {
+  id: true,
+  email: true,
+  name: true,
+  image: true,
+  role: true,
+  emailVerified: true,
+} as const;
 
 // Session endpoint to retrieve user from session token
 router.get('/session', async (req: Request, res: Response) => {
   try {
-    // Get the session token from cookies
-    const cookies = req.headers.cookie || '';
-    const authTokenMatch = cookies.match(/auth-token=([^;]+)/);
-    const sessionTokenMatch = cookies.match(/better-auth\.session_token=([^;]+)/);
-    
-    const token = authTokenMatch?.[1] || sessionTokenMatch?.[1];
+    applyNoStoreHeaders(res);
+
+    const betterAuthSession = await resolveBetterAuthSession(req, res);
+
+    if (betterAuthSession?.user?.id) {
+      const session = (betterAuthSession as any).session || betterAuthSession;
+      const fullUser = await prisma.user.findUnique({
+        where: { id: betterAuthSession.user.id },
+        select: selectUserPayload,
+      });
+
+      if (!fullUser) {
+        return res.status(401).json({ error: 'User not found' });
+      }
+
+      if (session?.expiresAt && new Date((session as any).expiresAt) < new Date()) {
+        return res.status(401).json({ error: 'Session expired' });
+      }
+
+      return res.status(200).json({
+        user: fullUser,
+        session: {
+          id: (session as any)?.id || '',
+          expiresAt: (session as any)?.expiresAt,
+        },
+      });
+    }
+
+    const token = getLegacySessionToken(req);
 
     if (!token) {
       return res.status(401).json({ error: 'No session token found' });
     }
 
-    console.log('Looking up session with token:', token.substring(0, 20) + '...');
+    console.log('Looking up legacy OAuth session with token:', token.substring(0, 20) + '...');
 
-    // Find the session in database
     const session = await prisma.session.findUnique({
       where: { token },
-      include: { user: true },
+      include: {
+        user: {
+          select: selectUserPayload,
+        },
+      },
     });
 
     if (!session) {
-      console.log('Session not found');
+      console.log('Legacy OAuth session not found');
       return res.status(401).json({ error: 'Session not found' });
     }
 
-    // Check if session has expired
     if (session.expiresAt < new Date()) {
-      console.log('Session expired');
+      console.log('Legacy OAuth session expired');
       await prisma.session.delete({ where: { id: session.id } });
       return res.status(401).json({ error: 'Session expired' });
     }
 
-    console.log('Session found for user:', session.user.email);
-
-    // Return the user data
     return res.status(200).json({
-      user: {
-        id: session.user.id,
-        email: session.user.email,
-        name: session.user.name,
-        image: session.user.image,
-        role: session.user.role,
-        emailVerified: session.user.emailVerified,
-      },
+      user: session.user,
       session: {
         id: session.id,
         expiresAt: session.expiresAt,
@@ -69,17 +138,20 @@ router.get('/session', async (req: Request, res: Response) => {
 
 router.post('/sign-out', async (req: Request, res: Response) => {
   try {
-    const cookies = req.headers.cookie || '';
-    const authTokenMatch = cookies.match(/auth-token=([^;]+)/);
-    const sessionTokenMatch = cookies.match(/better-auth\.session_token=([^;]+)/);
-    const token = authTokenMatch?.[1] || sessionTokenMatch?.[1];
+    const token = getLegacySessionToken(req);
 
     if (token) {
       await prisma.session.deleteMany({ where: { token } });
     }
 
-    res.clearCookie('auth-token', authCookieOptions);
-    res.clearCookie('better-auth.session_token', authCookieOptions);
+    const betterAuthSession = await resolveBetterAuthSession(req, res);
+    const betterAuthSessionId = (betterAuthSession as any)?.session?.id;
+
+    if (betterAuthSessionId) {
+      await prisma.session.deleteMany({ where: { id: betterAuthSessionId } });
+    }
+
+    clearManagedSessionCookies(res);
 
     return res.status(200).json({ success: true });
   } catch (error: any) {
@@ -89,4 +161,3 @@ router.post('/sign-out', async (req: Request, res: Response) => {
 });
 
 export default router;
-

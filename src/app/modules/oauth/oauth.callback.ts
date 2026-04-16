@@ -1,15 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../../config/prisma';
+import { setLegacySessionCookie } from './oauth.cookies';
 
 const router = Router();
-const isProduction = process.env.NODE_ENV === 'production';
-const authCookieOptions = {
-  httpOnly: true,
-  sameSite: isProduction ? ('none' as const) : ('lax' as const),
-  secure: isProduction,
-  path: '/',
-  maxAge: 7 * 24 * 60 * 60 * 1000,
-};
 
 // Track processed auth codes to prevent reuse (only in memory for this process)
 const processedCodes = new Map<string, { timestamp: number; sessionToken: string }>();
@@ -47,7 +40,7 @@ router.get('/google', async (req: Request, res: Response) => {
     if (cachedAuth && Date.now() - cachedAuth.timestamp < 10 * 60 * 1000) {
       console.log('♻️ Code already processed, reusing session token:', code.substring(0, 20) + '...');
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      res.cookie('auth-token', cachedAuth.sessionToken, authCookieOptions);
+      setLegacySessionCookie(res, cachedAuth.sessionToken);
 
       return res.redirect(`${frontendUrl}/dashboard?oauth_success=true`);
     }
@@ -100,7 +93,7 @@ router.get('/google', async (req: Request, res: Response) => {
         if (recentSession) {
           console.log('✅ Found recent session for this auth attempt, reusing...');
           const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-          res.cookie('auth-token', recentSession.token, authCookieOptions);
+          setLegacySessionCookie(res, recentSession.token);
 
           return res.redirect(`${frontendUrl}/dashboard?oauth_success=true`);
         }
@@ -194,7 +187,7 @@ router.get('/google', async (req: Request, res: Response) => {
 
     // Set session cookie
     console.log('🍪 Setting session cookie...');
-    res.cookie('auth-token', sessionToken, authCookieOptions);
+    setLegacySessionCookie(res, sessionToken);
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     console.log('🎯 Redirecting to:', `${frontendUrl}/dashboard?oauth_success=true`);
