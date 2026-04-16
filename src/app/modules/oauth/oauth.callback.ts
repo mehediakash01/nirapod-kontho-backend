@@ -1,8 +1,19 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../../config/prisma';
 import { setLegacySessionCookie } from './oauth.cookies';
+import { createOauthHandoff } from './oauth.handoff';
 
 const router = Router();
+
+const buildFrontendRedirectUrl = async (frontendUrl: string, sessionToken: string) => {
+  const redirectUrl = new URL(`${frontendUrl}/dashboard`);
+  const handoffCode = await createOauthHandoff(sessionToken);
+
+  redirectUrl.searchParams.set('oauth_success', 'true');
+  redirectUrl.searchParams.set('oauth_handoff', handoffCode);
+
+  return redirectUrl.toString();
+};
 
 // Track processed auth codes to prevent reuse (only in memory for this process)
 const processedCodes = new Map<string, { timestamp: number; sessionToken: string }>();
@@ -42,7 +53,7 @@ router.get('/google', async (req: Request, res: Response) => {
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       setLegacySessionCookie(res, cachedAuth.sessionToken);
 
-      return res.redirect(`${frontendUrl}/dashboard?oauth_success=true`);
+      return res.redirect(await buildFrontendRedirectUrl(frontendUrl, cachedAuth.sessionToken));
     }
 
     console.log('🔵 Processing OAuth callback for Google with code:', code.substring(0, 20) + '...');
@@ -95,7 +106,7 @@ router.get('/google', async (req: Request, res: Response) => {
           const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
           setLegacySessionCookie(res, recentSession.token);
 
-          return res.redirect(`${frontendUrl}/dashboard?oauth_success=true`);
+          return res.redirect(await buildFrontendRedirectUrl(frontendUrl, recentSession.token));
         }
         
         throw tokenError;
@@ -190,9 +201,10 @@ router.get('/google', async (req: Request, res: Response) => {
     setLegacySessionCookie(res, sessionToken);
 
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    console.log('🎯 Redirecting to:', `${frontendUrl}/dashboard?oauth_success=true`);
+    const redirectUrl = await buildFrontendRedirectUrl(frontendUrl, sessionToken);
+    console.log('🎯 Redirecting to:', redirectUrl);
 
-    return res.redirect(`${frontendUrl}/dashboard?oauth_success=true`);
+    return res.redirect(redirectUrl);
   } catch (error: any) {
     console.error('❌ OAuth callback error:', error);
     const errorMessage = error?.message || String(error) || 'Unknown error';

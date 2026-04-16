@@ -5,7 +5,9 @@ import {
   applyNoStoreHeaders,
   clearManagedSessionCookies,
   getLegacySessionToken,
+  setLegacySessionCookie,
 } from './oauth.cookies';
+import { consumeOauthHandoff } from './oauth.handoff';
 
 const router = Router();
 
@@ -68,6 +70,16 @@ const selectUserPayload = {
 router.get('/session', async (req: Request, res: Response) => {
   try {
     applyNoStoreHeaders(res);
+    const handoffCode = typeof req.query.handoff === 'string' ? req.query.handoff : null;
+    let legacyToken = getLegacySessionToken(req);
+
+    if (!legacyToken && handoffCode) {
+      legacyToken = await consumeOauthHandoff(handoffCode);
+
+      if (legacyToken) {
+        setLegacySessionCookie(res, legacyToken);
+      }
+    }
 
     const betterAuthSession = await resolveBetterAuthSession(req, res);
 
@@ -95,16 +107,14 @@ router.get('/session', async (req: Request, res: Response) => {
       });
     }
 
-    const token = getLegacySessionToken(req);
-
-    if (!token) {
+    if (!legacyToken) {
       return res.status(401).json({ error: 'No session token found' });
     }
 
-    console.log('Looking up legacy OAuth session with token:', token.substring(0, 20) + '...');
+    console.log('Looking up legacy OAuth session with token:', legacyToken.substring(0, 20) + '...');
 
     const session = await prisma.session.findUnique({
-      where: { token },
+      where: { token: legacyToken },
       include: {
         user: {
           select: selectUserPayload,

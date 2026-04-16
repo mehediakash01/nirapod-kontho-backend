@@ -1967,7 +1967,54 @@ var oauth_route_default = router7;
 
 // src/app/modules/oauth/oauth.callback.ts
 import { Router as Router2 } from "express";
+
+// src/app/modules/oauth/oauth.handoff.ts
+import { randomUUID } from "crypto";
+var OAUTH_HANDOFF_PREFIX = "oauth-handoff:";
+var OAUTH_HANDOFF_TTL_MS = 2 * 60 * 1e3;
+var buildIdentifier = (handoffCode) => `${OAUTH_HANDOFF_PREFIX}${handoffCode}`;
+var createOauthHandoff = async (sessionToken) => {
+  const handoffCode = randomUUID();
+  await prisma.verification.create({
+    data: {
+      identifier: buildIdentifier(handoffCode),
+      value: JSON.stringify({ sessionToken }),
+      expiresAt: new Date(Date.now() + OAUTH_HANDOFF_TTL_MS)
+    }
+  });
+  return handoffCode;
+};
+var consumeOauthHandoff = async (handoffCode) => {
+  const identifier = buildIdentifier(handoffCode);
+  const handoff = await prisma.verification.findFirst({
+    where: { identifier }
+  });
+  if (!handoff) {
+    return null;
+  }
+  await prisma.verification.deleteMany({
+    where: { identifier }
+  });
+  if (handoff.expiresAt < /* @__PURE__ */ new Date()) {
+    return null;
+  }
+  try {
+    const parsedValue = JSON.parse(handoff.value);
+    return parsedValue.sessionToken || null;
+  } catch {
+    return handoff.value || null;
+  }
+};
+
+// src/app/modules/oauth/oauth.callback.ts
 var router8 = Router2();
+var buildFrontendRedirectUrl = async (frontendUrl, sessionToken) => {
+  const redirectUrl = new URL(`${frontendUrl}/dashboard`);
+  const handoffCode = await createOauthHandoff(sessionToken);
+  redirectUrl.searchParams.set("oauth_success", "true");
+  redirectUrl.searchParams.set("oauth_handoff", handoffCode);
+  return redirectUrl.toString();
+};
 var processedCodes = /* @__PURE__ */ new Map();
 async function fetchJson(url, options) {
   const response = await fetch(url, options);
@@ -1996,7 +2043,7 @@ router8.get("/google", async (req, res) => {
       console.log("\u267B\uFE0F Code already processed, reusing session token:", code.substring(0, 20) + "...");
       const frontendUrl2 = process.env.FRONTEND_URL || "http://localhost:3000";
       setLegacySessionCookie(res, cachedAuth.sessionToken);
-      return res.redirect(`${frontendUrl2}/dashboard?oauth_success=true`);
+      return res.redirect(await buildFrontendRedirectUrl(frontendUrl2, cachedAuth.sessionToken));
     }
     console.log("\u{1F535} Processing OAuth callback for Google with code:", code.substring(0, 20) + "...");
     if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
@@ -2037,7 +2084,7 @@ router8.get("/google", async (req, res) => {
           console.log("\u2705 Found recent session for this auth attempt, reusing...");
           const frontendUrl2 = process.env.FRONTEND_URL || "http://localhost:3000";
           setLegacySessionCookie(res, recentSession.token);
-          return res.redirect(`${frontendUrl2}/dashboard?oauth_success=true`);
+          return res.redirect(await buildFrontendRedirectUrl(frontendUrl2, recentSession.token));
         }
         throw tokenError;
       }
@@ -2110,8 +2157,9 @@ router8.get("/google", async (req, res) => {
     console.log("\u{1F36A} Setting session cookie...");
     setLegacySessionCookie(res, sessionToken);
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
-    console.log("\u{1F3AF} Redirecting to:", `${frontendUrl}/dashboard?oauth_success=true`);
-    return res.redirect(`${frontendUrl}/dashboard?oauth_success=true`);
+    const redirectUrl = await buildFrontendRedirectUrl(frontendUrl, sessionToken);
+    console.log("\u{1F3AF} Redirecting to:", redirectUrl);
+    return res.redirect(redirectUrl);
   } catch (error) {
     console.error("\u274C OAuth callback error:", error);
     const errorMessage = error?.message || String(error) || "Unknown error";
@@ -2175,6 +2223,14 @@ var selectUserPayload = {
 router9.get("/session", async (req, res) => {
   try {
     applyNoStoreHeaders(res);
+    const handoffCode = typeof req.query.handoff === "string" ? req.query.handoff : null;
+    let legacyToken = getLegacySessionToken(req);
+    if (!legacyToken && handoffCode) {
+      legacyToken = await consumeOauthHandoff(handoffCode);
+      if (legacyToken) {
+        setLegacySessionCookie(res, legacyToken);
+      }
+    }
     const betterAuthSession = await resolveBetterAuthSession(req, res);
     if (betterAuthSession?.user?.id) {
       const session2 = betterAuthSession.session || betterAuthSession;
@@ -2196,13 +2252,12 @@ router9.get("/session", async (req, res) => {
         }
       });
     }
-    const token = getLegacySessionToken(req);
-    if (!token) {
+    if (!legacyToken) {
       return res.status(401).json({ error: "No session token found" });
     }
-    console.log("Looking up legacy OAuth session with token:", token.substring(0, 20) + "...");
+    console.log("Looking up legacy OAuth session with token:", legacyToken.substring(0, 20) + "...");
     const session = await prisma.session.findUnique({
-      where: { token },
+      where: { token: legacyToken },
       include: {
         user: {
           select: selectUserPayload
