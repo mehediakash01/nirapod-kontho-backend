@@ -15,6 +15,7 @@ import { NotificationRoutes } from './app/modules/notification/notificaiton.rout
 import { PaymentRoutes } from './app/modules/payment/payment.route';
 import { PaymentController } from './app/modules/payment/payment.controller';
 import { UserRoutes } from './app/modules/user/user.route';
+import { AnalyticsRoutes } from './app/modules/analytics/analytics.route';
 import OAuthRoutes from './app/modules/oauth/oauth.route';
 import OAuthCallbackRoutes from './app/modules/oauth/oauth.callback';
 import OAuthSessionRoutes from './app/modules/oauth/oauth.session';
@@ -207,6 +208,7 @@ app.use('/api/cases', CaseRoutes);
 app.use('/api/notifications', NotificationRoutes);
 app.use('/api/payments', PaymentRoutes);
 app.use('/api/users', UserRoutes);
+app.use('/api/analytics', AnalyticsRoutes);
 app.use('/api/oauth/callback', OAuthCallbackRoutes);
 app.use('/api/oauth', OAuthSessionRoutes);
 app.use('/api/oauth', OAuthRoutes);
